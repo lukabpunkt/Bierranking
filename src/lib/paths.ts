@@ -15,7 +15,7 @@ export function groupHref(groupId: string, sub: Sub = "", extra: Record<string, 
   return `/g/${sub ? sub + "/" : ""}?${params.toString()}`;
 }
 
-/** Absolute URL im Browser (inkl. Basis-Pfad), z. B. für Einladungs- und Magic-Links. */
+/** Absolute URL im Browser (inkl. Basis-Pfad), z. B. für Einladungslinks. */
 export function absoluteUrl(path: string) {
   return `${window.location.origin}${BASE_PATH}${path}`;
 }

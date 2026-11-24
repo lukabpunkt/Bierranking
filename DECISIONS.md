@@ -19,7 +19,6 @@
     - **Session im `localStorage`** (supabase-js, PKCE). `SessionProvider` hält Nutzer, Profil und Gruppenliste.
     - **IDs als Query-Parameter statt Pfadsegmente:** `/g/?id=…`, `/g/beer/?id=…&beer=…`, `/join/?code=…`. Ein statischer Export kann keine beliebigen dynamischen Pfade erzeugen.
     - `basePath` kommt aus `NEXT_PUBLIC_BASE_PATH` (Pages: `/Bierranking`), mit `trailingSlash: true`, damit Pages `…/index.html` findet.
-    - **Callback** `/auth/callback/` ist eine Client-Seite und tauscht `code` bzw. `token_hash` gegen eine Session.
 11. **Laden der Daten:** Der Client-Kontext `GroupProvider` lädt Biere, Bewertungen und Mitglieder einer Gruppe einmal. Er lädt neu, wenn man in den Tab zurückkehrt, und nach jeder Mutation. Suche, Sortierung, Filter, Vergleich und Statistik laufen ohne Roundtrip. Paginierung über 1000 Zeilen ist eingebaut.
 12. **Mutationen** laufen direkt über den Supabase-Client. RLS ist die Sicherheitsgrenze.
 13. **Durchschnitte** werden clientseitig aus den Bewertungen berechnet. Die View `beer_stats` bleibt für spätere Nutzung bestehen.
@@ -35,7 +34,7 @@
 20. **Doppelte Biere** prüft die App zuerst lokal (gleicher Schlüssel wie der DB-Index: `lower(name)` + `lower(brauerei)`), danach greift der Unique-Index (`23505`). In beiden Fällen erscheint „Das Bier gibt es schon“ mit Link.
 21. **Zuletzt genutzte Gruppe** und zuletzt genutztes Gebinde liegen im `localStorage` (pro Gerät).
 22. **Join-Flow:** Nicht eingeloggt führt `/join/?code=…` zu `/login/?next=/join/?code=…&auto=1`. Nach Login und gegebenenfalls Onboarding tritt man automatisch bei.
-23. **Magic Link:** Der Callback unterstützt PKCE (`?code=`) und `token_hash` (für ein angepasstes E-Mail-Template, siehe README).
+23. **Anmeldung per E-Mail + Passwort statt Magic Link** (ausdrücklicher Wunsch, abweichend von der Spec): Registrieren und Anmelden ohne Bestätigungs-Mail. Voraussetzung ist „Confirm email“ aus in Supabase. Passwort ändern geht im Profil. „Passwort vergessen“ gibt es bewusst nicht, weil dafür eine E-Mail nötig wäre; Admins setzen notfalls im Supabase-Dashboard ein neues Passwort. Der Callback `/auth/callback/` bleibt nur für den optionalen Google-Login.
 24. **Service Worker** ohne Offline-Cache: Er macht die App nur installierbar. Daten sollen nie veraltet aus einem Cache kommen.
 25. **Vergleich, „Gruppen-Matrix“:** Sie ist als vierter Tab „Alle (Matrix)“ umgesetzt und zeigt alle Mitglieder und alle Biere mit mindestens einer Bewertung.
 26. **Mitglieder:** Admins können andere zum Admin machen und entfernen. „Admin entziehen“ gibt es nicht (nicht in der Spec). Das schützt auch davor, dass eine Gruppe ohne Admin dasteht.

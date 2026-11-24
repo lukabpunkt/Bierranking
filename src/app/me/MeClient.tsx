@@ -14,6 +14,7 @@ import { forgetGroup } from "@/lib/lastGroup";
 import type { Beer, Rating, Serving } from "@/lib/types";
 import { useGroup } from "@/components/GroupProvider";
 import { ProfileForm } from "@/components/ProfileForm";
+import { PasswordForm } from "@/components/PasswordForm";
 import { GradeBadge } from "@/components/GradeBadge";
 import { Button, Card, Chip, Switch, inputClass } from "@/components/ui";
 import { SkeletonBlock } from "@/components/Skeleton";
@@ -302,6 +303,10 @@ export function MeClient({ email }: { email: string }) {
             ))}
           </ul>
         )}
+      </Card>
+
+      <Card>
+        <PasswordForm />
       </Card>
 
       <Card className="space-y-2">

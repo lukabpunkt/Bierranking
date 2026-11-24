@@ -1,12 +1,18 @@
 import { expect, test } from "@playwright/test";
 
-test("Login-Seite zeigt Magic-Link-Formular", async ({ page }) => {
+test("Login-Seite: E-Mail + Passwort, Umschalten auf Registrieren", async ({ page }) => {
   await page.goto("/login/");
   await expect(page.getByRole("heading", { name: "Prost-Zeugnis" })).toBeVisible();
-  await expect(page.getByLabel("E-Mail-Adresse")).toBeVisible();
-  await expect(page.getByRole("button", { name: /Link senden/ })).toBeDisabled();
+  const submit = page.getByRole("button", { name: "Anmelden", exact: true });
+  await expect(submit).toBeDisabled();
   await page.getByLabel("E-Mail-Adresse").fill("test@example.com");
-  await expect(page.getByRole("button", { name: /Link senden/ })).toBeEnabled();
+  await page.getByLabel("Passwort", { exact: true }).fill("geheim123");
+  await expect(submit).toBeEnabled();
+  await page.getByRole("tab", { name: "Registrieren" }).click();
+  await page.getByLabel("Passwort", { exact: true }).fill("123");
+  await expect(page.getByText("Mindestens 6 Zeichen.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Konto erstellen" })).toBeDisabled();
+  await expect(page.getByText(/Link senden/)).toHaveCount(0);
 });
 
 test("Geschützte Seiten leiten zum Login um und merken das Ziel", async ({ page }) => {
@@ -24,7 +30,7 @@ test("Ungültiger Einladungslink ist ohne Login sichtbar", async ({ page }) => {
 test("Fehlerhafter Auth-Link führt zurück zum Login mit Hinweis", async ({ page }) => {
   await page.goto("/auth/callback/?code=kaputt");
   await expect(page).toHaveURL(/\/login\/\?error=link/);
-  await expect(page.getByText(/ungültig oder abgelaufen/)).toBeVisible();
+  await expect(page.getByText(/Anmeldung hat nicht geklappt/)).toBeVisible();
 });
 
 test("PWA-Manifest und Icons sind erreichbar", async ({ request }) => {

@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { safeNext } from "@/lib/errors";
 import { useSession } from "@/components/SessionProvider";
 
-/** Ziel des Magic Links: tauscht den Code gegen eine Session und springt zum Ziel. */
+/** Rückkehr vom (optionalen) Google-Login: tauscht den Code gegen eine Session und springt zum Ziel. */
 function Callback() {
   const router = useRouter();
   const params = useSearchParams();

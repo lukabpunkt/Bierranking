@@ -57,23 +57,25 @@ NEXT_PUBLIC_ENABLE_GOOGLE=false
 
 Beide Supabase-Werte sind **öffentlich** (sie landen ohnehin im Browser); die Sicherheit kommt aus RLS. Der `service_role`-/Secret-Key wird nirgends gebraucht und darf **nie** ins Repo.
 
-### 3. Auth-URLs in Supabase ⚠️ (Pflicht für den Magic Link)
+### 3. Anmeldung: E-Mail + Passwort ⚠️ (eine Einstellung in Supabase)
 
-Supabase-Dashboard → **Authentication → URL Configuration**:
+Man registriert sich mit E-Mail-Adresse und Passwort und meldet sich später damit wieder an – **ohne Bestätigungs-Mail oder Link**. Dafür muss in Supabase die E-Mail-Bestätigung aus sein:
 
+Dashboard → **Authentication → Sign In / Providers → Email** → **„Confirm email“ ausschalten** → Save.
+(Direktlink: <https://supabase.com/dashboard/project/iczhiknsnmlrsvimperc/auth/providers>)
+
+Ist sie an, versucht Supabase bei jeder Registrierung eine Mail zu verschicken – die App zeigt dann einen Hinweis statt einzuloggen.
+
+- Mindestlänge Passwort: 6 Zeichen (Supabase-Standard, änderbar unter Authentication → Sign In / Providers → Email).
+- Passwort ändern geht jederzeit im Profil („Ich“ → „Passwort ändern“), solange man angemeldet ist.
+- **Passwort vergessen** gibt es bewusst nicht (würde eine E-Mail brauchen). Ein Admin kann im Supabase-Dashboard unter Authentication → Users ein neues Passwort setzen.
+- Sessions bleiben im Browser gespeichert – man bleibt angemeldet, bis man sich abmeldet.
+
+### 4. Nur für Google-Login: Auth-URLs
+
+Für E-Mail + Passwort ist nichts weiter nötig. Nur wenn Google-Login aktiviert wird, unter **Authentication → URL Configuration** eintragen:
 - **Site URL:** `https://lukabpunkt.github.io/Bierranking/`
-- **Redirect URLs:**
-  - `https://lukabpunkt.github.io/Bierranking/**`
-  - `http://localhost:3000/**`
-
-Der Magic Link führt auf `/auth/callback/?next=…`; ohne diese Einträge landet man nach dem Klick nicht in der App.
-
-**Hinweis:** Der Link muss im **selben Browser** geöffnet werden, in dem er angefordert wurde (PKCE). Wer das umgehen will, ändert im E-Mail-Template (Authentication → Email Templates → Magic Link) den Link auf
-`{{ .SiteURL }}auth/callback/?token_hash={{ .TokenHash }}&type=email` – der Callback unterstützt beides.
-
-### 4. E-Mail-Versand (SMTP)
-
-Der eingebaute Supabase-Mailversand ist nur zum Testen gedacht (wenige Mails pro Stunde). Für echte Nutzung unter **Authentication → Emails → SMTP Settings** einen eigenen SMTP-Dienst hinterlegen (z. B. Resend, Brevo, Postmark) und ggf. **Authentication → Rate Limits** anheben.
+- **Redirect URLs:** `https://lukabpunkt.github.io/Bierranking/**`, `http://localhost:3000/**`
 
 ### 5. Optional: Google-Login
 
@@ -148,12 +150,12 @@ Entscheidungen und Abweichungen von der Spezifikation: [`DECISIONS.md`](./DECISI
 ## Tests
 
 - **Unit (Vitest):** `npm test` – Noten, Umlaut-Suche, Einigkeit/Streitbiere, Sortierung inkl. „Unbewertete ans Ende“.
-- **Smoke (Playwright):** `npm run test:e2e` – Login-Seite, Weiterleitungen, Join-Vorschau, Manifest/Icons, 375-px-Breite. Ohne Zugangsdaten.
-- **Kompletter Ablauf (optional):** `e2e/flow.spec.ts` spielt mit drei echten Nutzern alles durch (Onboarding, Gruppe, Bewerten/Überschreiben, Duplikat, Einladung → Login → Beitritt, RLS-Prüfung, Verdecken-Modus, Vergleich, CSV-Export, Rückgängig/Papierkorb, „letzter Admin“). Der Magic Link wird per Passwort-Login umgangen.
+- **Smoke (Playwright):** `npm run test:e2e` – Login-/Registrier-Formular, Weiterleitungen, Join-Vorschau, Manifest/Icons, 375-px-Breite. Ohne Zugangsdaten.
+- **Kompletter Ablauf (optional):** `e2e/flow.spec.ts` spielt mit drei echten Nutzern alles durch (Onboarding, Gruppe, Bewerten/Überschreiben, Duplikat, Einladung → Login → Beitritt, RLS-Prüfung, Verdecken-Modus, Vergleich, CSV-Export, Rückgängig/Papierkorb, „letzter Admin“). Enthält Login über das Formular (falsches/richtiges Passwort, Session nach Neuladen). Mit `E2E_SIGNUP=1` zusätzlich: Registrieren → Abmelden → wieder Anmelden → doppelte Registrierung (nur bei ausgeschaltetem „Confirm email“; legt einen Nutzer `e2e-signup-…@example.com` an).
   1. Drei Testnutzer mit Passwort anlegen (Dashboard → Authentication → Users → „Add user“, „Auto Confirm“).
   2. `E2E_A_EMAIL=… E2E_B_EMAIL=… E2E_C_EMAIL=… E2E_PASSWORD=… npm run test:e2e` (optional `E2E_SCREENSHOTS=<ordner>`).
   3. Vor einem weiteren Lauf die Testnutzer zurücksetzen bzw. danach löschen – am besten nur in einem Test-Projekt.
 
 ## Lokale Supabase (optional)
 
-Mit Docker: `supabase start` → nutzt `supabase/config.toml`, spielt Migration + `seed.sql` ein. Magic-Link-Mails landen in Mailpit (<http://127.0.0.1:54324>). URL/Key aus `supabase status` in `.env.local` übernehmen.
+Mit Docker: `supabase start` → nutzt `supabase/config.toml`, spielt Migration + `seed.sql` ein. URL/Key aus `supabase status` in `.env.local` übernehmen.

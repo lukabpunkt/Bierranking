@@ -49,6 +49,21 @@ async function rate(page: Page, opts: { search: string; create?: { brewery: stri
   await page.getByRole("radio", { name: opts.serving }).click();
 }
 
+test("Anmelden über das Formular: falsches Passwort, richtiges Passwort, Abmelden", async ({ page }) => {
+  await page.goto("/login/");
+  await page.getByLabel("E-Mail-Adresse").fill(A);
+  await page.getByLabel("Passwort", { exact: true }).fill("falsch-falsch");
+  await page.getByRole("button", { name: "Anmelden", exact: true }).click();
+  await expect(page.getByText("E-Mail oder Passwort ist falsch.")).toBeVisible();
+  await page.getByLabel("Passwort", { exact: true }).fill(PW);
+  await page.getByRole("button", { name: "Anmelden", exact: true }).click();
+  await expect(page).toHaveURL(/\/onboarding\//);
+  // Session bleibt nach Neuladen erhalten
+  await page.reload();
+  await expect(page).toHaveURL(/\/onboarding\//);
+  await expect(page.getByRole("heading", { name: "Willkommen!" })).toBeVisible();
+});
+
 test("A: Onboarding, Gruppe erstellen, Bier anlegen und bewerten", async ({ page, context }) => {
   await loginAs(context, A, PW);
   await page.goto("/");
@@ -244,4 +259,40 @@ test("A: Bewertung löschen + Rückgängig, Bier löschen + Papierkorb", async (
   await page.getByRole("button", { name: "Gruppe verlassen" }).click();
   await page.getByRole("button", { name: /verlassen/ }).last().click();
   await expect(page.getByText("Du bist der letzte Admin")).toBeVisible();
+});
+
+test("Registrieren mit E-Mail + Passwort und später wieder anmelden", async ({ page }) => {
+  test.skip(env.E2E_SIGNUP !== "1", "Nur wenn in Supabase „Confirm email“ aus ist (E2E_SIGNUP=1)");
+  const email = `e2e-signup-${Date.now()}@example.com`;
+  const password = "Bier-" + Math.random().toString(36).slice(2, 10);
+  await page.goto("/login/");
+  await page.getByRole("tab", { name: "Registrieren" }).click();
+  await page.getByLabel("E-Mail-Adresse").fill(email);
+  await page.getByLabel("Passwort", { exact: true }).fill(password);
+  await page.getByRole("button", { name: "Konto erstellen" }).click();
+  await expect(page).toHaveURL(/\/onboarding\//);
+  await page.getByLabel("Name").fill("Neu E2E");
+  await page.getByRole("button", { name: /Los geht/ }).click();
+  await expect(page).toHaveURL(/\/groups\//);
+
+  // Abmelden …
+  await page.goto("/me/");
+  await page.getByRole("button", { name: "Abmelden" }).click();
+  await expect(page).toHaveURL(/\/login\//);
+
+  // … und mit denselben Daten wieder anmelden
+  await page.getByLabel("E-Mail-Adresse").fill(email);
+  await page.getByLabel("Passwort", { exact: true }).fill(password);
+  await page.getByRole("button", { name: "Anmelden", exact: true }).click();
+  await expect(page).toHaveURL(/\/groups\//);
+  await expect(page.getByText("Hallo Neu E2E")).toBeVisible();
+
+  // Doppelte Registrierung wird abgefangen
+  await page.goto("/me/");
+  await page.getByRole("button", { name: "Abmelden" }).click();
+  await page.getByRole("tab", { name: "Registrieren" }).click();
+  await page.getByLabel("E-Mail-Adresse").fill(email);
+  await page.getByLabel("Passwort", { exact: true }).fill(password);
+  await page.getByRole("button", { name: "Konto erstellen" }).click();
+  await expect(page.getByText(/schon registriert|E-Mail oder Passwort/)).toBeVisible();
 });
