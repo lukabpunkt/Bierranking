@@ -29,7 +29,8 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
       {children}
       <div
         className="pointer-events-none fixed inset-x-0 z-50 flex flex-col items-center gap-2 px-4"
-        style={{ bottom: "calc(5.75rem + env(safe-area-inset-bottom))" }}
+        // über Navigation UND den fixierten Aktions-Buttons (Speichern/Bewerten)
+        style={{ bottom: "calc(9.5rem + env(safe-area-inset-bottom))" }}
         aria-live="polite"
         role="status"
       >
