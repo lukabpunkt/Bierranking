@@ -18,7 +18,10 @@ test.skip(!A || !B || !C || !PW, "E2E-Testnutzer nicht konfiguriert");
 test.describe.configure({ mode: "serial" });
 
 const GROUP = `E2E Stammtisch ${Date.now().toString().slice(-5)}`;
-let groupUrl = "";
+let groupUrl = ""; // z. B. /g/?id=<uuid>
+let groupId = "";
+const esc = (x: string) => x.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const sub = (name: string) => `/g/${name}/?id=${groupId}`;
 let inviteUrl = "";
 
 async function shot(page: Page, name: string) {
@@ -59,8 +62,10 @@ test("A: Onboarding, Gruppe erstellen, Bier anlegen und bewerten", async ({ page
   await shot(page, "02-groups-empty");
   await page.getByLabel("Name der Gruppe").fill(GROUP);
   await page.getByRole("button", { name: "Gruppe erstellen" }).click();
-  await expect(page).toHaveURL(/\/g\/[0-9a-f-]{36}$/);
-  groupUrl = new URL(page.url()).pathname;
+  await expect(page).toHaveURL(/\/g\/\?id=[0-9a-f-]{36}$/);
+  const u = new URL(page.url());
+  groupId = u.searchParams.get("id")!;
+  groupUrl = `/g/?id=${groupId}`;
   await expect(page.getByText("Noch kein Bier hier – Durst?")).toBeVisible();
   await shot(page, "03-list-empty");
 
@@ -70,7 +75,7 @@ test("A: Onboarding, Gruppe erstellen, Bier anlegen und bewerten", async ({ page
   await shot(page, "04-rate");
   await noHorizontalScroll(page);
   await page.getByRole("button", { name: "Speichern" }).click();
-  await expect(page).toHaveURL(/\/beer\//);
+  await expect(page).toHaveURL(/\/g\/beer\/\?/);
   await expect(page.getByText(/Gespeichert 🍻/)).toBeVisible();
   await expect(page.getByRole("heading", { name: "Löwenbräu Original" })).toBeVisible();
 
@@ -98,38 +103,38 @@ test("A: Onboarding, Gruppe erstellen, Bier anlegen und bewerten", async ({ page
   await page.goto(groupUrl);
   await rate(page, { search: "Tegernseer Hell", create: { brewery: "Tegernsee" }, grade: 1, mod: "+", serving: "Gezapft" });
   await page.getByRole("button", { name: "Speichern" }).click();
-  await expect(page).toHaveURL(/\/beer\//);
+  await expect(page).toHaveURL(/\/g\/beer\/\?/);
 
-  await page.goto(`${groupUrl}/settings`);
+  await page.goto(sub("settings"));
   inviteUrl = await page.getByLabel("Einladungslink").inputValue();
-  expect(inviteUrl).toMatch(/\/join\/[0-9a-f]{12}$/);
+  expect(inviteUrl).toMatch(/\/join\/\?code=[0-9a-f]{12}$/);
   await shot(page, "06-settings");
 });
 
 test("B: Einladung ohne Login → Login → Onboarding → automatisch Mitglied", async ({ page, context }) => {
-  const path = new URL(inviteUrl).pathname;
+  const inv = new URL(inviteUrl);
+  const path = inv.pathname + inv.search;
   await page.goto(path);
   await expect(page.getByRole("heading", { name: `„${GROUP}“` })).toBeVisible();
   await expect(page.getByText("1 Mitglied")).toBeVisible();
   await shot(page, "07-join-preview");
   const loginHref = await page.getByRole("link", { name: /Anmelden/ }).getAttribute("href");
-  expect(loginHref).toContain(encodeURIComponent(`${path}?auto=1`));
+  expect(loginHref).toContain(encodeURIComponent(`${path}&auto=1`));
 
   // Login simulieren und dem "next"-Ziel folgen, wie es der Magic-Link-Callback tut
   await loginAs(context, B, PW);
-  await page.goto(`${path}?auto=1`);
-  await expect(page).toHaveURL(/\/onboarding\?next=/);
+  await page.goto(`${path}&auto=1`);
+  await expect(page).toHaveURL(/\/onboarding\/\?next=/);
   await page.getByLabel("Name").fill("Tom E2E");
   await page.getByRole("button", { name: /Los geht/ }).click();
-  await expect(page).toHaveURL(new RegExp(`${groupUrl}$`));
+  await expect(page).toHaveURL(new RegExp(`${esc(groupUrl)}$`));
   await expect(page.getByText("Löwenbräu Original")).toBeVisible();
   await expect(page.getByText("Tegernseer Hell")).toBeVisible();
 });
 
 test("RLS: Nicht-Mitglied C sieht per API keine Gruppendaten", async () => {
   const c = await apiAs(C, PW);
-  const groupId = groupUrl.split("/").pop()!;
-  const [{ data: beers }, { data: groups }, { data: members }, { data: ratings }] = await Promise.all([
+    const [{ data: beers }, { data: groups }, { data: members }, { data: ratings }] = await Promise.all([
     c.from("beers").select("*").eq("group_id", groupId),
     c.from("groups").select("*").eq("id", groupId),
     c.from("group_members").select("*").eq("group_id", groupId),
@@ -182,7 +187,7 @@ test("B: Suche, Sortierung, Verdecken-Modus, Vergleich, Export", async ({ page, 
   // B bewertet Löwenbräu → Vergleich
   await rate(page, { search: "Löwenbräu", grade: 5, serving: "Flasche" });
   await page.getByRole("button", { name: "Speichern" }).click();
-  await expect(page).toHaveURL(/\/beer\//);
+  await expect(page).toHaveURL(/\/g\/beer\/\?/);
   await page.getByRole("navigation", { name: "Hauptnavigation" }).getByRole("link", { name: "Vergleich" }).click();
   await expect(page.getByRole("heading", { name: "Vergleich" })).toBeVisible();
   await expect(page.getByRole("rowheader", { name: "Löwenbräu Original" })).toBeVisible();
@@ -224,18 +229,18 @@ test("A: Bewertung löschen + Rückgängig, Bier löschen + Papierkorb", async (
 
   await page.getByRole("button", { name: "Weitere Aktionen" }).click();
   await page.getByRole("button", { name: "Bier löschen" }).click();
-  await expect(page).toHaveURL(new RegExp(`${groupUrl}$`));
+  await expect(page).toHaveURL(new RegExp(`${esc(groupUrl)}$`));
   await expect(page.getByRole("link", { name: /Tegernseer Hell/ })).toHaveCount(0);
   await expect(page.getByText(/„Tegernseer Hell“ gelöscht/)).toBeVisible();
 
-  await page.goto(`${groupUrl}/settings`);
+  await page.goto(sub("settings"));
   await page.getByRole("button", { name: "Zurück" }).click();
   await expect(page.getByText(/wiederhergestellt/)).toBeVisible();
   await page.goto(groupUrl);
   await expect(page.getByRole("link", { name: /Tegernseer Hell/ })).toBeVisible();
 
   // Letzter Admin kann nicht austreten
-  await page.goto(`${groupUrl}/settings`);
+  await page.goto(sub("settings"));
   await page.getByRole("button", { name: "Gruppe verlassen" }).click();
   await page.getByRole("button", { name: /verlassen/ }).last().click();
   await expect(page.getByText("Du bist der letzte Admin")).toBeVisible();

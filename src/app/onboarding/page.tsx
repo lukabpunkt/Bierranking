@@ -1,15 +1,19 @@
-import { redirect } from "next/navigation";
-import { requireUser } from "@/lib/session";
+"use client";
+
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect } from "react";
 import { safeNext } from "@/lib/errors";
+import { RequireAuth } from "@/components/RequireAuth";
 import { ProfileForm } from "@/components/ProfileForm";
+import type { Profile } from "@/lib/types";
 
-export const metadata = { title: "Willkommen · Prost-Zeugnis" };
+function Onboarding({ profile }: { profile: Profile }) {
+  const router = useRouter();
+  const target = safeNext(useSearchParams().get("next"), "/");
 
-export default async function OnboardingPage({ searchParams }: { searchParams: Promise<{ next?: string }> }) {
-  const { next } = await searchParams;
-  const { profile } = await requireUser({ allowNotOnboarded: true });
-  const target = safeNext(next, "/");
-  if (profile.onboarded) redirect(target);
+  useEffect(() => {
+    if (profile.onboarded) router.replace(target);
+  }, [profile.onboarded, router, target]);
 
   return (
     <main className="mx-auto min-h-dvh max-w-[640px] px-5 py-10">
@@ -22,5 +26,13 @@ export default async function OnboardingPage({ searchParams }: { searchParams: P
       </div>
       <ProfileForm profile={profile} onboarding redirectTo={target} />
     </main>
+  );
+}
+
+export default function OnboardingPage() {
+  return (
+    <Suspense>
+      <RequireAuth allowNotOnboarded>{({ profile }) => <Onboarding profile={profile} />}</RequireAuth>
+    </Suspense>
   );
 }

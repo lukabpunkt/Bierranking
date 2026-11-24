@@ -12,8 +12,11 @@ jobs:
   backup:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      HAS_SECRETS: ${{ secrets.SUPABASE_DB_URL != '' && secrets.BACKUP_PASSPHRASE != '' }}
     steps:
       - name: PostgreSQL-Client installieren
+        if: ${{ env.HAS_SECRETS == 'true' }}
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq postgresql-common
@@ -23,10 +26,12 @@ jobs:
       - name: Dump erstellen
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
         run: |
-          if [ -z "$SUPABASE_DB_URL" ]; then
-            echo "::error::Secret SUPABASE_DB_URL fehlt (Settings → Secrets and variables → Actions)."
-            exit 1
+          if [ -z "$SUPABASE_DB_URL" ] || [ -z "$BACKUP_PASSPHRASE" ]; then
+            echo "::warning::Secrets SUPABASE_DB_URL und/oder BACKUP_PASSPHRASE fehlen – Backup übersprungen (siehe README)."
+            echo "SKIP=1" >> "$GITHUB_ENV"
+            exit 0
           fi
           STAMP=$(date -u +%Y-%m-%d_%H%M)
           echo "STAMP=$STAMP" >> "$GITHUB_ENV"
@@ -36,12 +41,17 @@ jobs:
             --no-owner --no-privileges --quote-all-identifiers \
             --file="prost-zeugnis-$STAMP.sql"
           gzip -9 "prost-zeugnis-$STAMP.sql"
-          ls -lh "prost-zeugnis-$STAMP.sql.gz"
+          # Verschlüsseln (AES-256): Das Repo ist öffentlich, Artifacts sind für GitHub-Nutzer abrufbar.
+          gpg --batch --yes --pinentry-mode loopback --passphrase "$BACKUP_PASSPHRASE" \
+            --symmetric --cipher-algo AES256 -o "prost-zeugnis-$STAMP.sql.gz.gpg" "prost-zeugnis-$STAMP.sql.gz"
+          rm "prost-zeugnis-$STAMP.sql.gz"
+          ls -lh "prost-zeugnis-$STAMP.sql.gz.gpg"
 
       - name: Als Artifact speichern (90 Tage)
+        if: env.SKIP != '1'
         uses: actions/upload-artifact@v4
         with:
           name: prost-zeugnis-backup-${{ env.STAMP }}
-          path: prost-zeugnis-*.sql.gz
+          path: prost-zeugnis-*.sql.gz.gpg
           retention-days: 90
           if-no-files-found: error

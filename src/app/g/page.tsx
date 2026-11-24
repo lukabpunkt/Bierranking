@@ -1,3 +1,5 @@
+"use client";
+
 import { Suspense } from "react";
 import { BeerList } from "@/components/BeerList";
 import { SkeletonList } from "@/components/Skeleton";

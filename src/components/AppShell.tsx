@@ -1,5 +1,6 @@
 "use client";
 
+import { groupHref } from "@/lib/paths";
 import Link from "next/link";
 import { Eye, EyeOff, Settings } from "lucide-react";
 import { BottomNav } from "./BottomNav";
@@ -28,7 +29,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 {hideGrades ? <EyeOff size={22} aria-hidden /> : <Eye size={22} aria-hidden />}
               </button>
               <Link
-                href={`/g/${groupId}/settings`}
+                href={groupHref(groupId, "settings")}
                 aria-label="Gruppeneinstellungen"
                 className="flex h-11 w-11 items-center justify-center rounded-full text-muted transition hover:bg-card-2"
               >

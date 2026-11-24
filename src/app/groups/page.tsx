@@ -1,11 +1,21 @@
-import { loadMyGroups, requireUser } from "@/lib/session";
+"use client";
+
+import { Suspense } from "react";
+import { useSearchParams } from "next/navigation";
+import { RequireAuth } from "@/components/RequireAuth";
 import { GroupsClient } from "./GroupsClient";
 
-export const metadata = { title: "Meine Gruppen · Prost-Zeugnis" };
+function Groups() {
+  const focusNew = useSearchParams().get("new") === "1";
+  return (
+    <RequireAuth>{({ groups, profile }) => <GroupsClient groups={groups} profile={profile} focusNew={focusNew} />}</RequireAuth>
+  );
+}
 
-export default async function GroupsPage({ searchParams }: { searchParams: Promise<{ new?: string }> }) {
-  const { new: wantsNew } = await searchParams;
-  const { supabase, user, profile } = await requireUser({ next: "/groups" });
-  const groups = await loadMyGroups(supabase, user.id);
-  return <GroupsClient groups={groups} profile={profile} focusNew={wantsNew === "1"} />;
+export default function GroupsPage() {
+  return (
+    <Suspense>
+      <Groups />
+    </Suspense>
+  );
 }

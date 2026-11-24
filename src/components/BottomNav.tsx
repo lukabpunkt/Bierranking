@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Beer, Plus, Scale, User, type LucideIcon } from "lucide-react";
 import { useGroup } from "./GroupProvider";
+import { groupHref, normalizePath } from "@/lib/paths";
 
 type NavItem = { href: string; label: string; icon: LucideIcon; active: boolean };
 
@@ -24,26 +25,25 @@ function NavLink({ item }: { item: NavItem }) {
 }
 
 export function BottomNav() {
-  const pathname = usePathname();
+  const pathname = normalizePath(usePathname());
   const { groupId } = useGroup();
-  const base = groupId ? `/g/${groupId}` : null;
 
   const beers: NavItem = {
-    href: base ?? "/groups",
+    href: groupId ? groupHref(groupId) : "/groups/",
     label: "Biere",
     icon: Beer,
-    active: base ? pathname === base || pathname.startsWith(`${base}/beer`) : pathname === "/groups",
+    active: groupId ? pathname === "/g" || pathname === "/g/beer" : pathname === "/groups",
   };
   const compare: NavItem = {
-    href: base ? `${base}/compare` : "/groups",
+    href: groupId ? groupHref(groupId, "compare") : "/groups/",
     label: "Vergleich",
     icon: Scale,
-    active: !!base && pathname.startsWith(`${base}/compare`),
+    active: pathname === "/g/compare",
   };
-  const me: NavItem = { href: "/me", label: "Ich", icon: User, active: pathname === "/me" };
+  const me: NavItem = { href: "/me/", label: "Ich", icon: User, active: pathname === "/me" };
 
-  const rateHref = base ? `${base}/rate` : "/groups";
-  const rateActive = !!base && pathname.startsWith(`${base}/rate`);
+  const rateHref = groupId ? groupHref(groupId, "rate") : "/groups/";
+  const rateActive = pathname === "/g/rate";
 
   return (
     <nav

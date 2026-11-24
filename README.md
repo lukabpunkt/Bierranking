@@ -2,7 +2,9 @@
 
 Mobile-first Web-App (PWA), in der Freundeskreise in eigenen Gruppen Biere eintragen und nach deutschen Schulnoten (1+ bis 6) bewerten – getrennt nach Dose 🥫, Flasche 🍾 und gezapft 🍺.
 
-**Stack:** Next.js 16 (App Router, TypeScript) · Tailwind CSS 4 · Supabase (Postgres, Auth, RLS) · lucide-react · Vitest · Playwright
+**Live:** <https://lukabpunkt.github.io/Bierranking/>
+
+**Stack:** Next.js 16 (App Router, TypeScript, statischer Export) · Tailwind CSS 4 · Supabase (Postgres, Auth, RLS) · lucide-react · Vitest · Playwright · Hosting auf GitHub Pages
 
 ---
 
@@ -17,109 +19,107 @@ npm run dev                        # http://localhost:3000
 | Befehl | Zweck |
 |---|---|
 | `npm run dev` | Entwicklungsserver |
-| `npm run build` / `npm start` | Produktions-Build / -Server |
+| `npm run build` | Statischer Export nach `out/` |
 | `npm test` | Unit-Tests (Vitest) |
-| `npm run test:e2e` | Playwright-Smoke-Tests (startet den Dev-Server selbst) |
+| `npm run test:e2e` | Playwright-Tests (startet den Dev-Server selbst) |
 | `npm run lint` | ESLint |
 | `npm run types` | DB-Typen neu generieren → `src/lib/database.types.ts` |
 | `node scripts/icons.mjs` | PWA-Icons aus `public/icons/icon.svg` neu erzeugen |
 
 ---
 
-## Einrichtung Schritt für Schritt
+## Architektur in einem Satz
+
+Die App ist ein **reiner statischer Export** (kein Node-Server): Next.js erzeugt HTML/JS, das auf GitHub Pages liegt. Login, Daten und Rechte laufen direkt zwischen Browser und Supabase – geschützt durch **Row Level Security** in der Datenbank. Gruppen und Biere stehen deshalb als Parameter in der URL (`/g/?id=…`, `/g/beer/?id=…&beer=…`, `/join/?code=…`).
+
+---
+
+## Einrichtung
 
 ### 1. Supabase-Projekt
 
-1. Auf [supabase.com](https://supabase.com) ein Projekt anlegen (Region z. B. Frankfurt/Irland).
-2. Schema einspielen – **eine** der beiden Varianten:
-   - **CLI:** `supabase login` → `supabase link --project-ref <projekt-ref>` → `supabase db push`
-   - **Dashboard:** Inhalt von `supabase/migrations/0001_init.sql` im SQL-Editor ausführen.
-3. *(Nur lokal/Test)* `supabase/seed.sql` enthält Beispieldaten (3 Personen, 15 Biere). **Nicht** in Produktion ausführen.
+Das Projekt **„Bier Ranking“** (`iczhiknsnmlrsvimperc`) ist eingerichtet, die Migration ist eingespielt. Für ein neues Projekt:
 
-> Das Projekt **„Bier Ranking“** (`iczhiknsnmlrsvimperc`) ist bereits eingerichtet – Migration ist eingespielt.
+1. Auf [supabase.com](https://supabase.com) ein Projekt anlegen.
+2. Schema einspielen: `supabase link --project-ref <ref>` → `supabase db push` – oder `supabase/migrations/0001_init.sql` im SQL-Editor ausführen.
+3. `supabase/seed.sql` enthält Beispieldaten (nur lokal, **nicht** in Produktion).
 
 ### 2. Umgebungsvariablen
 
-In `.env.local` (lokal) bzw. beim Hoster:
+Lokal in `.env.local`:
 
 ```
 NEXT_PUBLIC_SUPABASE_URL=https://<projekt-ref>.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=<publishable- bzw. anon-Key>
-NEXT_PUBLIC_SITE_URL=https://<deine-domain>      # lokal: http://localhost:3000
-NEXT_PUBLIC_ENABLE_GOOGLE=false                  # true nur, wenn Google in Supabase eingerichtet ist
+NEXT_PUBLIC_BASE_PATH=                   # lokal leer; auf Pages setzt der Workflow "/Bierranking"
+NEXT_PUBLIC_ENABLE_GOOGLE=false
 ```
 
-Beide Supabase-Werte stehen unter **Project Settings → API Keys**. Der `service_role`-/Secret-Key wird **nirgends** gebraucht und darf **nie** ins Frontend.
+Beide Supabase-Werte sind **öffentlich** (sie landen ohnehin im Browser); die Sicherheit kommt aus RLS. Der `service_role`-/Secret-Key wird nirgends gebraucht und darf **nie** ins Repo.
 
-### 3. Auth-URLs in Supabase (wichtig für den Magic Link!)
+### 3. Auth-URLs in Supabase ⚠️ (Pflicht für den Magic Link)
 
-Dashboard → **Authentication → URL Configuration**:
+Supabase-Dashboard → **Authentication → URL Configuration**:
 
-- **Site URL:** `https://<deine-domain>` (lokal reicht `http://localhost:3000`)
-- **Redirect URLs** (alle hinzufügen):
+- **Site URL:** `https://lukabpunkt.github.io/Bierranking/`
+- **Redirect URLs:**
+  - `https://lukabpunkt.github.io/Bierranking/**`
   - `http://localhost:3000/**`
-  - `https://<deine-domain>/**`
-  - für Netlify-/Vercel-Previews z. B. `https://*--<site>.netlify.app/**` bzw. `https://*-<team>.vercel.app/**`
 
-Der Magic Link führt auf `/auth/callback?next=…`. Ist eine URL nicht freigegeben, schickt Supabase auf die Site URL zurück – die App leitet einen dort ankommenden `?code=` automatisch zum Callback weiter, der Rücksprung zur ursprünglichen Seite (z. B. Einladungslink) geht dann aber verloren.
+Der Magic Link führt auf `/auth/callback/?next=…`; ohne diese Einträge landet man nach dem Klick nicht in der App.
 
-**Hinweis:** Der Link muss im **selben Browser** geöffnet werden, in dem er angefordert wurde (PKCE). Wer den Link oft auf einem anderen Gerät öffnet, kann im E-Mail-Template (Authentication → Email Templates → Magic Link) stattdessen
-`{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=email` verwenden – der Callback unterstützt beides.
+**Hinweis:** Der Link muss im **selben Browser** geöffnet werden, in dem er angefordert wurde (PKCE). Wer das umgehen will, ändert im E-Mail-Template (Authentication → Email Templates → Magic Link) den Link auf
+`{{ .SiteURL }}auth/callback/?token_hash={{ .TokenHash }}&type=email` – der Callback unterstützt beides.
 
-### 4. E-Mail-Versand (SMTP) für den Produktivbetrieb
+### 4. E-Mail-Versand (SMTP)
 
-Der eingebaute Supabase-Mailversand ist nur zum Testen gedacht (sehr niedrige Limits, nur wenige Mails pro Stunde). Für echte Nutzung unter **Authentication → Emails → SMTP Settings** einen eigenen SMTP-Server hinterlegen (z. B. Resend, Brevo, Postmark, Mailjet). Danach ggf. das Rate-Limit unter **Authentication → Rate Limits** anheben.
+Der eingebaute Supabase-Mailversand ist nur zum Testen gedacht (wenige Mails pro Stunde). Für echte Nutzung unter **Authentication → Emails → SMTP Settings** einen eigenen SMTP-Dienst hinterlegen (z. B. Resend, Brevo, Postmark) und ggf. **Authentication → Rate Limits** anheben.
 
 ### 5. Optional: Google-Login
 
-Authentication → Sign In / Providers → Google aktivieren (OAuth-Client in der Google Cloud Console anlegen, Redirect-URI `https://<projekt-ref>.supabase.co/auth/v1/callback`). Dann `NEXT_PUBLIC_ENABLE_GOOGLE=true` setzen.
+Authentication → Sign In / Providers → Google aktivieren, dann im Repo unter **Settings → Secrets and variables → Actions → Variables** `NEXT_PUBLIC_ENABLE_GOOGLE=true` setzen.
 
 ---
 
-## Deployment
+## Deployment (GitHub Pages)
 
-### Vercel
-1. Repo auf GitHub pushen (privat!) → auf [vercel.com](https://vercel.com) „Add New Project“ → Repo wählen. Framework wird erkannt.
-2. Die vier Umgebungsvariablen eintragen (`NEXT_PUBLIC_SITE_URL` = Vercel-Domain).
-3. Deploy. Danach Domain in Supabase als Site URL / Redirect URL eintragen (Schritt 3).
+`.github/workflows/pages.yml` baut bei **jedem Push auf `main`** (oder manuell über „Run workflow“): Unit-Tests → statischer Build → Veröffentlichung auf <https://lukabpunkt.github.io/Bierranking/>.
 
-### Netlify
-1. Auf [netlify.com](https://netlify.com) „Add new site → Import an existing project“ → Repo wählen. Netlify erkennt Next.js automatisch (OpenNext-Adapter, Build-Befehl `npm run build`).
-2. Umgebungsvariablen unter **Site configuration → Environment variables** eintragen.
-3. Deploy. Danach Domain in Supabase eintragen (Schritt 3).
+- Pages-Quelle: **Settings → Pages → Source: GitHub Actions** (ist eingerichtet).
+- Supabase-URL/Key stehen als öffentliche Standardwerte im Workflow und lassen sich über Repo-**Variables** (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`) überschreiben.
+- Den Unterpfad (`/Bierranking`) ermittelt der Workflow automatisch. Mit eigener Domain fällt er weg – dann Site/Redirect-URLs in Supabase anpassen.
 
 ---
 
 ## Datensicherheit & Backups
 
-- Alle Daten liegen in Supabase (Postgres). **Row Level Security** ist auf allen Tabellen aktiv: Nur Gruppenmitglieder sehen die Daten ihrer Gruppe.
-- **Soft Delete** für Biere und Bewertungen (`deleted_at`). Gelöschte Biere stellen Admins im **Papierkorb** (Gruppeneinstellungen) wieder her. Endgültig gelöscht wird nur beim Löschen der ganzen Gruppe.
-- **Änderungsprotokoll** der Bier-Stammdaten in `beer_history` (im Bier-Menü „Änderungsverlauf“).
-- **Export** im Profil: eigene Daten als CSV, Gruppe als CSV oder JSON (CSV = UTF-8 mit BOM, Semikolon → öffnet direkt in Excel).
+- **Row Level Security** auf allen Tabellen: Nur Mitglieder sehen die Daten ihrer Gruppe (auch per direktem API-Zugriff).
+- **Soft Delete** für Biere und Bewertungen; gelöschte Biere stellen Admins im **Papierkorb** (Gruppeneinstellungen) wieder her. Endgültig gelöscht wird nur beim Löschen der ganzen Gruppe.
+- **Änderungsprotokoll** der Bier-Stammdaten (`beer_history`).
+- **Export** im Profil: eigene Daten als CSV, Gruppe als CSV oder JSON (UTF-8 mit BOM, Semikolon → öffnet direkt in Excel).
 
-### Automatisches Backup (GitHub Actions)
+### Automatisches Backup (verschlüsselt)
 
-`.github/workflows/backup.yml` erstellt **jeden Montag** (und manuell über „Run workflow“) einen `pg_dump` der Schemas `public` und `auth` und legt ihn **gezippt als Workflow-Artifact für 90 Tage** ab.
+`.github/workflows/backup.yml` erstellt **jeden Montag** (und manuell) einen `pg_dump` der Schemas `public` und `auth`, **verschlüsselt ihn mit AES-256** und legt ihn als Workflow-Artifact für **90 Tage** ab. Die Verschlüsselung ist nötig, weil das Repo öffentlich ist (für GitHub Pages im Free-Plan) und Artifacts dann für GitHub-Nutzer abrufbar sind.
 
-Einrichtung:
-1. Supabase → **Connect** (oben) → **Session pooler** → Connection-String kopieren, z. B.
-   `postgresql://postgres.<ref>:<DB-PASSWORT>@aws-0-eu-west-1.pooler.supabase.com:5432/postgres`
-   (Das DB-Passwort lässt sich unter Project Settings → Database zurücksetzen.)
-2. GitHub-Repo → **Settings → Secrets and variables → Actions → New repository secret**: Name `SUPABASE_DB_URL`, Wert = Connection-String.
-3. **Das Repo muss privat sein** – Artifacts enthalten alle Daten.
-4. Test: Actions → „Datenbank-Backup“ → „Run workflow“.
+Einrichtung (ohne diese Secrets wird das Backup einfach übersprungen):
+1. Supabase → **Connect** → **Session pooler** → Connection-String kopieren
+   (`postgresql://postgres.<ref>:<DB-PASSWORT>@aws-0-eu-west-1.pooler.supabase.com:5432/postgres`; das DB-Passwort lässt sich unter Project Settings → Database zurücksetzen).
+2. GitHub-Repo → **Settings → Secrets and variables → Actions → New repository secret**:
+   - `SUPABASE_DB_URL` = Connection-String
+   - `BACKUP_PASSPHRASE` = ein langes, zufälliges Passwort – **gut aufbewahren** (Passwortmanager), sonst ist das Backup wertlos.
+3. Test: Actions → „Datenbank-Backup“ → „Run workflow“.
 
 Wiederherstellen:
 ```bash
-gunzip prost-zeugnis-2026-01-05_0300.sql.gz
-# In ein frisches Projekt (Migration NICHT vorher einspielen – der Dump enthält das Schema):
-psql "<connection-string-des-ziel-projekts>" < prost-zeugnis-2026-01-05_0300.sql
+gpg --decrypt prost-zeugnis-2026-01-05_0300.sql.gz.gpg > backup.sql.gz   # fragt nach BACKUP_PASSPHRASE
+gunzip backup.sql.gz
+psql "<connection-string-des-ziel-projekts>" < backup.sql   # in ein frisches Projekt (enthält das Schema)
 ```
-Für ein bestehendes Projekt vorher die betroffenen Tabellen leeren bzw. nur einzelne Tabellen aus dem Dump übernehmen.
 
 ### Pausierte Projekte (Free Plan)
 
-Kostenlose Supabase-Projekte werden nach einer Zeit ohne Aktivität (derzeit ca. 1 Woche) **pausiert**. Die Daten bleiben erhalten; die App zeigt dann nur Ladefehler. Reaktivieren: Supabase-Dashboard → Projekt öffnen → **„Restore project“** (dauert ein paar Minuten). Aktuelle Bedingungen: <https://supabase.com/pricing> und <https://supabase.com/docs/guides/platform/billing-on-supabase>. Wer das vermeiden will, nimmt den Pro-Plan.
+Kostenlose Supabase-Projekte werden nach etwa einer Woche ohne Aktivität **pausiert**. Die Daten bleiben erhalten, die App zeigt dann Ladefehler. Reaktivieren: Supabase-Dashboard → Projekt → **„Restore project“**. Aktuelle Bedingungen: <https://supabase.com/pricing>.
 
 ---
 
@@ -127,36 +127,33 @@ Kostenlose Supabase-Projekte werden nach einer Zeit ohne Aktivität (derzeit ca.
 
 ```
 src/
-  app/                    Seiten (App Router)
-    login/ auth/callback/ onboarding/ groups/ join/[code]/ me/
-    g/[groupId]/          Bierliste · rate/ · beer/[beerId]/ · compare/ · settings/
+  app/                    Seiten (alle statisch, Daten kommen im Browser dazu)
+    login/ auth/callback/ onboarding/ groups/ join/ me/
+    g/                    Bierliste (?id=) · rate/ · beer/ · compare/ · settings/
     manifest.ts           PWA-Manifest
-  components/             UI (GradeBadge, GradePicker, BeerCard, BottomSheet, GroupProvider …)
+  components/             SessionProvider, RequireAuth, GroupProvider, GradeBadge, GradePicker, BeerCard …
   hooks/useRevealed.ts    Verdeckt/aufgedeckt pro Bier (sessionStorage)
-  lib/                    grades · servings · search · compare · beerList · export · supabase/*
-  proxy.ts                Session-Refresh + Login-Schutz (früher „middleware“)
+  lib/                    grades · servings · search · compare · beerList · export · paths · supabase/client
 supabase/
   migrations/0001_init.sql
   seed.sql                Beispieldaten (nur lokal)
-e2e/                      Playwright-Smoke-Tests
-.github/workflows/backup.yml
+e2e/                      Playwright-Tests
+.github/workflows/        pages.yml (Deploy) · backup.yml (verschlüsseltes Backup)
 ```
 
-Entscheidungen und Abweichungen von der Spezifikation: siehe [`DECISIONS.md`](./DECISIONS.md).
+Entscheidungen und Abweichungen von der Spezifikation: [`DECISIONS.md`](./DECISIONS.md).
 
-## Lokale Supabase (optional)
-
-Mit Docker: `supabase start` → nutzt `supabase/config.toml`, spielt Migration + `seed.sql` ein. Magic-Link-Mails landen in Mailpit unter <http://127.0.0.1:54324>. URL/Key aus `supabase status` in `.env.local` übernehmen.
+---
 
 ## Tests
 
-- **Unit (Vitest):** `npm test` – `grades`, `search`, `compare`, `beerList` (Noten, Umlaut-Suche, Einigkeit/Streitbiere, Sortierung inkl. „Unbewertete ans Ende“).
-- **Smoke (Playwright):** `npm run test:e2e` – Login-Seite, Weiterleitungen, Join-Vorschau, Manifest/Icons, 375-px-Breite. Braucht keine Zugangsdaten.
-- **Kompletter Ablauf (Playwright, optional):** `e2e/flow.spec.ts` spielt mit drei echten Nutzern alles durch (Onboarding, Gruppe, Bewerten/Überschreiben, Duplikat, Einladung → Login → Beitritt, RLS-Prüfung mit Nicht-Mitglied, Verdecken-Modus, Vergleich, CSV-Export, Rückgängig/Papierkorb, „letzter Admin“). Der Magic Link wird dabei per Passwort-Login umgangen.
-  1. Drei Testnutzer mit Passwort anlegen (Dashboard → Authentication → Users → „Add user“, „Auto Confirm“ an).
-  2. Starten:
-     ```bash
-     E2E_A_EMAIL=… E2E_B_EMAIL=… E2E_C_EMAIL=… E2E_PASSWORD=… npm run test:e2e
-     ```
-     Optional `E2E_SCREENSHOTS=<ordner>` für Screenshots jeder Station.
-  3. Vor jedem weiteren Lauf die Testnutzer zurücksetzen (Gruppen löschen, `profiles.onboarded = false`) bzw. die Nutzer danach wieder löschen – am besten nur in einem Test-/Branch-Projekt.
+- **Unit (Vitest):** `npm test` – Noten, Umlaut-Suche, Einigkeit/Streitbiere, Sortierung inkl. „Unbewertete ans Ende“.
+- **Smoke (Playwright):** `npm run test:e2e` – Login-Seite, Weiterleitungen, Join-Vorschau, Manifest/Icons, 375-px-Breite. Ohne Zugangsdaten.
+- **Kompletter Ablauf (optional):** `e2e/flow.spec.ts` spielt mit drei echten Nutzern alles durch (Onboarding, Gruppe, Bewerten/Überschreiben, Duplikat, Einladung → Login → Beitritt, RLS-Prüfung, Verdecken-Modus, Vergleich, CSV-Export, Rückgängig/Papierkorb, „letzter Admin“). Der Magic Link wird per Passwort-Login umgangen.
+  1. Drei Testnutzer mit Passwort anlegen (Dashboard → Authentication → Users → „Add user“, „Auto Confirm“).
+  2. `E2E_A_EMAIL=… E2E_B_EMAIL=… E2E_C_EMAIL=… E2E_PASSWORD=… npm run test:e2e` (optional `E2E_SCREENSHOTS=<ordner>`).
+  3. Vor einem weiteren Lauf die Testnutzer zurücksetzen bzw. danach löschen – am besten nur in einem Test-Projekt.
+
+## Lokale Supabase (optional)
+
+Mit Docker: `supabase start` → nutzt `supabase/config.toml`, spielt Migration + `seed.sql` ein. Magic-Link-Mails landen in Mailpit (<http://127.0.0.1:54324>). URL/Key aus `supabase status` in `.env.local` übernehmen.

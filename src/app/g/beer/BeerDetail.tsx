@@ -1,5 +1,6 @@
 "use client";
 
+import { groupHref } from "@/lib/paths";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
@@ -75,7 +76,7 @@ export function BeerDetail({ beerId }: { beerId: string }) {
     return (
       <EmptyState emoji="🫗" title="Bier nicht gefunden">
         <p className="text-muted">Vielleicht wurde es gelöscht.</p>
-        <ButtonLink href={`/g/${groupId}`}>Zur Bierliste</ButtonLink>
+        <ButtonLink href={groupHref(groupId!)}>Zur Bierliste</ButtonLink>
       </EmptyState>
     );
   }
@@ -121,7 +122,7 @@ export function BeerDetail({ beerId }: { beerId: string }) {
     const { error } = await createClient().from("beers").update({ deleted_at: new Date().toISOString() }).eq("id", beerId);
     if (error) return toast({ message: friendlyError(error), tone: "error" });
     await refresh();
-    router.push(`/g/${groupId}`);
+    router.push(groupHref(groupId!));
     toast({
       message: `„${beer!.name}“ gelöscht`,
       action: {
@@ -146,7 +147,7 @@ export function BeerDetail({ beerId }: { beerId: string }) {
     <div className="space-y-4 pb-20">
       <div className="flex items-center justify-between">
         <Link
-          href={`/g/${groupId}`}
+          href={groupHref(groupId!)}
           className="-ml-2 flex h-11 items-center gap-1 rounded-xl px-2 font-semibold text-muted hover:text-fg"
         >
           <ArrowLeft size={20} aria-hidden /> Biere
@@ -270,7 +271,7 @@ export function BeerDetail({ beerId }: { beerId: string }) {
                   {mine && (
                     <div className="mt-2 flex justify-end gap-1">
                       <Link
-                        href={`/g/${groupId}/rate?beer=${beerId}&serving=${r.serving}`}
+                        href={groupHref(groupId!, "rate", { beer: beerId, serving: r.serving })}
                         className="inline-flex min-h-11 items-center gap-1.5 rounded-xl px-3 text-sm font-semibold hover:bg-card-2"
                       >
                         <Pencil size={16} aria-hidden /> Bearbeiten
@@ -293,7 +294,7 @@ export function BeerDetail({ beerId }: { beerId: string }) {
 
       <div className="fixed inset-x-0 z-20 px-4" style={{ bottom: "calc(5.25rem + env(safe-area-inset-bottom))" }}>
         <div className="mx-auto max-w-[608px]">
-          <ButtonLink href={`/g/${groupId}/rate?beer=${beerId}`} className="h-14 w-full text-lg shadow-xl">
+          <ButtonLink href={groupHref(groupId!, "rate", { beer: beerId })} className="h-14 w-full text-lg shadow-xl">
             {s?.myRated ? "Nochmal bewerten" : "Bewerten"}
           </ButtonLink>
         </div>

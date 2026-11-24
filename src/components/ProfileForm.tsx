@@ -10,6 +10,7 @@ import type { Profile } from "@/lib/types";
 import { Avatar } from "./Avatar";
 import { Button, Field, inputClass } from "./ui";
 import { useToast } from "./Toast";
+import { useSession } from "./SessionProvider";
 
 export function ProfileForm({
   profile,
@@ -24,6 +25,7 @@ export function ProfileForm({
 }) {
   const router = useRouter();
   const toast = useToast();
+  const { setProfile } = useSession();
   const [name, setName] = useState(profile.display_name);
   const [emoji, setEmoji] = useState(profile.emoji);
   const [color, setColor] = useState(profile.color);
@@ -43,14 +45,10 @@ export function ProfileForm({
       toast({ message: friendlyError(error), tone: "error" });
       return;
     }
+    setProfile(data);
     onSaved?.(data);
-    if (redirectTo) {
-      router.replace(redirectTo);
-      router.refresh();
-    } else {
-      toast({ message: "Profil gespeichert" });
-      router.refresh();
-    }
+    if (redirectTo) router.replace(redirectTo);
+    else toast({ message: "Profil gespeichert" });
   }
 
   return (

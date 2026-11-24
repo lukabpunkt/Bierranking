@@ -1,5 +1,6 @@
 "use client";
 
+import { groupHref } from "@/lib/paths";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { Eye, Info, Search, SlidersHorizontal, X } from "lucide-react";
@@ -134,13 +135,13 @@ export function BeerList() {
         </EmptyState>
       ) : beers.length === 0 ? (
         <EmptyState emoji="🍺" title="Noch kein Bier hier – Durst?">
-          <ButtonLink href={`/g/${groupId}/rate`}>Erstes Bier bewerten</ButtonLink>
+          <ButtonLink href={groupHref(groupId!, "rate")}>Erstes Bier bewerten</ButtonLink>
         </EmptyState>
       ) : list.length === 0 ? (
         <EmptyState emoji="🔍" title="Nichts gefunden">
           <p className="text-muted">Probier eine andere Suche oder setz die Filter zurück.</p>
           {query.trim() && (
-            <ButtonLink href={`/g/${groupId}/rate?name=${encodeURIComponent(query.trim())}`}>
+            <ButtonLink href={groupHref(groupId!, "rate", { name: query.trim() })}>
               „{query.trim()}“ bewerten
             </ButtonLink>
           )}

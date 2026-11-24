@@ -1,14 +1,14 @@
-import { createBrowserClient } from "@supabase/ssr";
+import { createClient as create, type SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "../database.types";
 
-let client: ReturnType<typeof createBrowserClient<Database>> | undefined;
+let client: SupabaseClient<Database> | undefined;
 
+/** Ein Browser-Client für die ganze App. Session liegt im localStorage, Login per PKCE. */
 export function createClient() {
   if (!client) {
-    client = createBrowserClient<Database>(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    );
+    client = create<Database>(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
+      auth: { flowType: "pkce", persistSession: true, autoRefreshToken: true, detectSessionInUrl: false },
+    });
   }
   return client;
 }

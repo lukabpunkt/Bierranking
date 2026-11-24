@@ -1,3 +1,5 @@
+"use client";
+
 import { Suspense } from "react";
 import { RateFlow } from "./RateFlow";
 import { SkeletonBlock } from "@/components/Skeleton";

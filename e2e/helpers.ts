@@ -1,5 +1,4 @@
 import { readFileSync } from "node:fs";
-import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import type { BrowserContext } from "@playwright/test";
 
@@ -21,22 +20,19 @@ export const SUPABASE_URL = env.NEXT_PUBLIC_SUPABASE_URL;
 export const SUPABASE_KEY = env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 /**
- * Meldet einen Testnutzer per Passwort an und überträgt die Session-Cookies (Format von @supabase/ssr)
- * in den Browser-Kontext. Der echte Magic-Link-Versand wird damit umgangen.
+ * Meldet einen Testnutzer per Passwort an und legt die Session dort ab, wo supabase-js sie
+ * im Browser erwartet (localStorage „sb-<ref>-auth-token“). Der Magic-Link-Versand wird so umgangen.
  */
 export async function loginAs(context: BrowserContext, email: string, password: string) {
-  const jar = new Map<string, string>();
-  const supabase = createServerClient(SUPABASE_URL, SUPABASE_KEY, {
-    cookies: {
-      getAll: () => [...jar].map(([name, value]) => ({ name, value })),
-      setAll: (cookies) => cookies.forEach((c) => jar.set(c.name, c.value)),
+  const client = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: false } });
+  const { data, error } = await client.auth.signInWithPassword({ email, password });
+  if (error || !data.session) throw error ?? new Error("keine Session");
+  const key = `sb-${new URL(SUPABASE_URL).hostname.split(".")[0]}-auth-token`;
+  await context.addInitScript(
+    ([k, v]) => {
+      if (!window.localStorage.getItem(k)) window.localStorage.setItem(k, v);
     },
-  });
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
-  if (error) throw error;
-  await new Promise((r) => setTimeout(r, 100));
-  await context.addCookies(
-    [...jar].map(([name, value]) => ({ name, value, domain: "localhost", path: "/", sameSite: "Lax" as const })),
+    [key, JSON.stringify(data.session)] as const,
   );
 }
 

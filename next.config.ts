@@ -1,8 +1,14 @@
 import type { NextConfig } from "next";
 
-// Cache Components bewusst aus: Die App ist komplett nutzerbezogen (Session-Cookies),
-// klassisches dynamisches Rendering ist hier einfacher und robuster (siehe DECISIONS.md).
+// Statischer Export für GitHub Pages (kein Node-Server).
+// NEXT_PUBLIC_BASE_PATH = Unterpfad der Pages-URL, z. B. "/Bierranking" (lokal leer).
+const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+
 const nextConfig: NextConfig = {
+  output: "export",
+  basePath,
+  trailingSlash: true,
+  images: { unoptimized: true },
   turbopack: {
     rules: {
       "*.css": {

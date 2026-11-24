@@ -2,6 +2,8 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { ToastProvider } from "@/components/Toast";
 import { ServiceWorker } from "@/components/ServiceWorker";
+import { SessionProvider } from "@/components/SessionProvider";
+import { asset } from "@/lib/paths";
 
 export const metadata: Metadata = {
   title: "Prost-Zeugnis",
@@ -9,8 +11,8 @@ export const metadata: Metadata = {
   applicationName: "Prost-Zeugnis",
   appleWebApp: { capable: true, title: "Prost-Zeugnis", statusBarStyle: "default" },
   icons: {
-    icon: [{ url: "/icons/icon.svg", type: "image/svg+xml" }],
-    apple: [{ url: "/icons/apple-touch-icon.png", sizes: "180x180" }],
+    icon: [{ url: asset("/icons/icon.svg"), type: "image/svg+xml" }],
+    apple: [{ url: asset("/icons/apple-touch-icon.png"), sizes: "180x180" }],
   },
 };
 
@@ -28,7 +30,9 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="de">
       <body className="min-h-dvh antialiased">
-        <ToastProvider>{children}</ToastProvider>
+        <SessionProvider>
+          <ToastProvider>{children}</ToastProvider>
+        </SessionProvider>
         <ServiceWorker />
       </body>
     </html>

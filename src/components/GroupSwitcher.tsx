@@ -1,5 +1,6 @@
 "use client";
 
+import { groupHref } from "@/lib/paths";
 import Link from "next/link";
 import { useState } from "react";
 import { Check, ChevronDown, Plus, Users } from "lucide-react";
@@ -27,7 +28,7 @@ export function GroupSwitcher() {
           {groups.map((g) => (
             <li key={g.id}>
               <Link
-                href={`/g/${g.id}`}
+                href={groupHref(g.id)}
                 onClick={() => setOpen(false)}
                 className={`flex min-h-14 items-center gap-3 rounded-2xl px-4 ${
                   g.id === group?.id ? "bg-accent/15" : "bg-card-2 hover:brightness-[0.98]"
@@ -48,7 +49,7 @@ export function GroupSwitcher() {
           ))}
           <li>
             <Link
-              href="/groups?new=1"
+              href="/groups/?new=1"
               onClick={() => setOpen(false)}
               className="flex min-h-14 items-center gap-3 rounded-2xl border-2 border-dashed border-line px-4 font-bold"
             >

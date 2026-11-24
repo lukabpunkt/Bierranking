@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { average } from "@/lib/grades";
 import type { Beer, Group, Member, Profile, Rating, Role, Serving } from "@/lib/types";
 import { unknownProfile } from "@/lib/types";
-import type { MyGroup } from "@/lib/session";
+import { useSession, type MyGroup } from "./SessionProvider";
 import { useRevealed } from "@/hooks/useRevealed";
 import { rememberGroup } from "@/lib/lastGroup";
 
@@ -22,7 +22,8 @@ export type BeerStats = {
 type Ctx = {
   groupId: string | null;
   group: Group | null;
-  setGroup: (g: Group) => void;
+  /** Nach Änderungen an der Gruppe (Name, Code) die Gruppenliste neu laden. */
+  setGroup: (g?: Group) => void;
   role: Role | null;
   isAdmin: boolean;
   groups: MyGroup[];
@@ -71,22 +72,19 @@ async function fetchAll<T>(
   return out;
 }
 
-export function GroupProvider({
-  initialGroup,
-  role,
-  groups,
-  profile,
-  children,
-}: {
-  initialGroup: Group | null;
-  role: Role | null;
-  groups: MyGroup[];
-  profile: Profile;
-  children: React.ReactNode;
-}) {
-  const groupId = initialGroup?.id ?? null;
-  const [group, setGroup] = useState(initialGroup);
-  const [me, setMe] = useState(profile);
+/**
+ * Daten einer Gruppe (Mitglieder, Biere, Bewertungen) für alle Seiten darunter.
+ * `group` = null ist erlaubt (z. B. /me ohne Gruppe). Profil + Gruppenliste kommen aus der Session.
+ */
+export function GroupProvider({ group: groupProp, children }: { group: MyGroup | null; children: React.ReactNode }) {
+  const session = useSession();
+  const groups = session.groups;
+  const groupId = groupProp?.id ?? null;
+  const role = groupProp?.role ?? null;
+  const group: Group | null = groupProp;
+  const me = session.profile!;
+  const setMe = session.setProfile;
+  const setGroup = useCallback(() => void session.reloadGroups(), [session]);
   const [members, setMembers] = useState<Member[]>([]);
   const [beers, setBeers] = useState<Beer[]>([]);
   const [ratings, setRatings] = useState<Rating[]>([]);
@@ -94,14 +92,6 @@ export function GroupProvider({
   const [loadError, setLoadError] = useState<string | null>(null);
   const revealedState = useRevealed(groupId);
   const loadSeq = useRef(0);
-
-  // Server-Props können sich nach router.refresh() ändern → lokalen Zustand angleichen
-  const [prevProps, setPrevProps] = useState({ initialGroup, profile });
-  if (prevProps.initialGroup !== initialGroup || prevProps.profile !== profile) {
-    setPrevProps({ initialGroup, profile });
-    setGroup(initialGroup);
-    setMe(profile);
-  }
 
   const refresh = useCallback(async () => {
     if (!groupId) return;
@@ -211,11 +201,11 @@ export function GroupProvider({
 
   const setHideGrades = useCallback(
     async (v: boolean) => {
-      setMe((p) => ({ ...p, hide_grades: v }));
+      setMe({ ...me, hide_grades: v });
       const { error } = await createClient().from("profiles").update({ hide_grades: v }).eq("id", me.id);
-      if (error) setMe((p) => ({ ...p, hide_grades: !v }));
+      if (error) setMe({ ...me, hide_grades: !v });
     },
-    [me.id],
+    [me, setMe],
   );
 
   const { isRevealed, reveal, revealAll, allRevealed, wasJustRevealed } = revealedState;

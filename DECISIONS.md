@@ -13,11 +13,16 @@
 
 ## App-Architektur
 
-9. **Next.js 16 statt 15:** `create-next-app` installiert aktuell Next 16. Dort heißt die Middleware **`proxy.ts`** (`src/proxy.ts`), die Logik liegt in `src/lib/supabase/proxy.ts`.
-10. **Cache Components / PPR sind ausgeschaltet** (`next.config.ts`). Die App ist durchgehend nutzerbezogen (Session-Cookies, RLS). Klassisches dynamisches Rendering ist hier einfacher und robuster, statisches Vorrendern bringt nichts.
-11. **Laden der Daten:** Server Components prüfen Login, Onboarding und Mitgliedschaft (Layouts `g/[groupId]` und `/me`) und laden Gruppenliste und Profil. Biere, Bewertungen und Mitglieder einer Gruppe lädt der Client-Kontext `GroupProvider` einmal pro Gruppe. Er lädt neu, wenn man in den Tab zurückkehrt, und nach jeder Mutation. Suche, Sortierung, Filter, Vergleich und Statistik laufen dann ohne Server-Roundtrip (Suche „während des Tippens“). Bei Stammtisch-Größen (Hunderte Biere) ist das unkritisch, Paginierung über 1000 Zeilen ist eingebaut.
-12. **Mutationen** laufen einheitlich direkt über den Supabase-Browser-Client. RLS ist die Sicherheitsgrenze.
-13. **Durchschnitte** werden clientseitig aus den Bewertungen berechnet. Die View `beer_stats` bleibt für Exporte und spätere Nutzung bestehen. Ø pro Gebinde und gesamt basieren auf allen (nicht gelöschten) Einzelbewertungen.
+9. **Next.js 16**, aktuell von `create-next-app` installiert.
+10. **Statischer Export für GitHub Pages** (`output: "export"`, Wunsch: Hosting über GitHub Pages). Pages liefert nur Dateien aus, deshalb gilt:
+    - **Kein Server-Code:** kein Proxy/Middleware, keine Route Handler, keine Server Components mit Cookies. Login-Schutz und Onboarding-Prüfung macht `RequireAuth` im Browser. Die eigentliche Sicherheitsgrenze ist ohnehin RLS in der Datenbank.
+    - **Session im `localStorage`** (supabase-js, PKCE). `SessionProvider` hält Nutzer, Profil und Gruppenliste.
+    - **IDs als Query-Parameter statt Pfadsegmente:** `/g/?id=…`, `/g/beer/?id=…&beer=…`, `/join/?code=…`. Ein statischer Export kann keine beliebigen dynamischen Pfade erzeugen.
+    - `basePath` kommt aus `NEXT_PUBLIC_BASE_PATH` (Pages: `/Bierranking`), mit `trailingSlash: true`, damit Pages `…/index.html` findet.
+    - **Callback** `/auth/callback/` ist eine Client-Seite und tauscht `code` bzw. `token_hash` gegen eine Session.
+11. **Laden der Daten:** Der Client-Kontext `GroupProvider` lädt Biere, Bewertungen und Mitglieder einer Gruppe einmal. Er lädt neu, wenn man in den Tab zurückkehrt, und nach jeder Mutation. Suche, Sortierung, Filter, Vergleich und Statistik laufen ohne Roundtrip. Paginierung über 1000 Zeilen ist eingebaut.
+12. **Mutationen** laufen direkt über den Supabase-Client. RLS ist die Sicherheitsgrenze.
+13. **Durchschnitte** werden clientseitig aus den Bewertungen berechnet. Die View `beer_stats` bleibt für spätere Nutzung bestehen.
 
 ## Verhalten
 
@@ -28,10 +33,12 @@
 18. **Gebinde-Filter in der Liste:** Ein Bier passt, wenn es mindestens eine Bewertung mit einem der gewählten Gebinde hat.
 19. **Rückgängig nach dem Bewerten:** Gab es vorher schon eine Bewertung (gleiches Bier und Gebinde), werden deren alte Werte wiederhergestellt, sonst wird die neue Bewertung soft-gelöscht. Ein dabei neu angelegtes Bier bleibt bestehen.
 20. **Doppelte Biere** prüft die App zuerst lokal (gleicher Schlüssel wie der DB-Index: `lower(name)` + `lower(brauerei)`), danach greift der Unique-Index (`23505`). In beiden Fällen erscheint „Das Bier gibt es schon“ mit Link.
-21. **Zuletzt genutzte Gruppe** liegt im Cookie `pz_last_group`, damit `/` serverseitig direkt umleiten kann. Das zuletzt genutzte Gebinde liegt in `localStorage`.
-22. **Join-Flow:** Nicht eingeloggt führt `/join/<code>` zu `/login?next=/join/<code>?auto=1`. Nach Login und gegebenenfalls Onboarding tritt man automatisch bei.
-23. **Magic Link:** Der Callback unterstützt PKCE (`?code=`) und `token_hash` (für ein angepasstes E-Mail-Template, siehe README). Ein `?code=` auf einer anderen Seite wird zum Callback weitergeleitet, falls Supabase auf die Site URL zurückfällt.
+21. **Zuletzt genutzte Gruppe** und zuletzt genutztes Gebinde liegen im `localStorage` (pro Gerät).
+22. **Join-Flow:** Nicht eingeloggt führt `/join/?code=…` zu `/login/?next=/join/?code=…&auto=1`. Nach Login und gegebenenfalls Onboarding tritt man automatisch bei.
+23. **Magic Link:** Der Callback unterstützt PKCE (`?code=`) und `token_hash` (für ein angepasstes E-Mail-Template, siehe README).
 24. **Service Worker** ohne Offline-Cache: Er macht die App nur installierbar. Daten sollen nie veraltet aus einem Cache kommen.
 25. **Vergleich, „Gruppen-Matrix“:** Sie ist als vierter Tab „Alle (Matrix)“ umgesetzt und zeigt alle Mitglieder und alle Biere mit mindestens einer Bewertung.
 26. **Mitglieder:** Admins können andere zum Admin machen und entfernen. „Admin entziehen“ gibt es nicht (nicht in der Spec). Das schützt auch davor, dass eine Gruppe ohne Admin dasteht.
 27. **Phase 5** (Fotos, Realtime, Barcode, Wunschliste …) ist bewusst nicht umgesetzt: Laut Spec erst nach Zustimmung.
+28. **Backups verschlüsselt:** Das Repo ist öffentlich (Voraussetzung für Pages im Free-Plan), Workflow-Artifacts wären damit für GitHub-Nutzer abrufbar. Der Dump wird deshalb vor dem Upload mit `BACKUP_PASSPHRASE` per GPG/AES-256 verschlüsselt. Ohne Secrets überspringt der Workflow das Backup mit einer Warnung, statt jede Woche fehlzuschlagen.
+29. **Gemeinsamer Origin:** Alle Pages-Projekte eines Accounts teilen sich `lukabpunkt.github.io`, und damit den `localStorage`. Andere eigene Pages-Seiten könnten die Session also theoretisch lesen. Bei eigenen Repos ist das unkritisch. Mit einer eigenen Domain entfällt es.

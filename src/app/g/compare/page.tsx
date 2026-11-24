@@ -1,5 +1,6 @@
 "use client";
 
+import { groupHref } from "@/lib/paths";
 import Link from "next/link";
 import { useCallback, useMemo, useState } from "react";
 import { ArrowDownUp } from "lucide-react";
@@ -84,7 +85,7 @@ export default function ComparePage() {
     return (
       <EmptyState emoji="👥" title="Allein vergleicht sich's schlecht">
         <p className="text-muted">Lade Freunde in die Gruppe ein, dann könnt ihr eure Noten vergleichen.</p>
-        <Link href={`/g/${groupId}/settings`} className="font-semibold underline">
+        <Link href={groupHref(groupId!, "settings")} className="font-semibold underline">
           Einladungslink holen
         </Link>
       </EmptyState>
@@ -200,7 +201,7 @@ export default function ComparePage() {
                         scope="row"
                         className="sticky left-0 z-10 max-w-[9.5rem] border-t border-line bg-bg py-1.5 pr-3 text-left font-semibold"
                       >
-                        <Link href={`/g/${groupId}/beer/${beerId}`} className="line-clamp-2 hover:underline">
+                        <Link href={groupHref(groupId!, "beer", { beer: beerId })} className="line-clamp-2 hover:underline">
                           {beerName(beerId)}
                         </Link>
                       </th>
@@ -232,7 +233,7 @@ export default function ComparePage() {
                 <li key={beer}>
                   <Card className="flex items-center gap-3 p-3">
                     <div className="min-w-0 flex-1">
-                      <Link href={`/g/${groupId}/beer/${beer}`} className="block truncate font-bold hover:underline">
+                      <Link href={groupHref(groupId!, "beer", { beer })} className="block truncate font-bold hover:underline">
                         {beerName(beer)}
                       </Link>
                       {hidden ? (

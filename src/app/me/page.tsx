@@ -1,29 +1,28 @@
-import { lastGroupId, loadMyGroups, requireUser } from "@/lib/session";
+"use client";
+
+import { Suspense } from "react";
+import { RequireAuth } from "@/components/RequireAuth";
 import { GroupProvider } from "@/components/GroupProvider";
 import { AppShell } from "@/components/AppShell";
+import { lastGroup } from "@/lib/lastGroup";
 import { MeClient } from "./MeClient";
 
-export const metadata = { title: "Ich · Prost-Zeugnis" };
-
-export default async function MePage() {
-  const { supabase, user, profile } = await requireUser({ next: "/me" });
-  const groups = await loadMyGroups(supabase, user.id);
-  const last = await lastGroupId();
-  const current = groups.find((g) => g.id === last) ?? groups[0] ?? null;
-
-  let group = null;
-  if (current) {
-    const { role: _r, member_count: _c, ...rest } = current;
-    void _r;
-    void _c;
-    group = rest;
-  }
-
+export default function MePage() {
   return (
-    <GroupProvider initialGroup={group} role={current?.role ?? null} groups={groups} profile={profile}>
-      <AppShell>
-        <MeClient email={user.email ?? ""} />
-      </AppShell>
-    </GroupProvider>
+    <Suspense>
+      <RequireAuth>
+        {({ groups, user }) => {
+          const last = lastGroup();
+          const current = groups.find((g) => g.id === last) ?? groups[0] ?? null;
+          return (
+            <GroupProvider key={current?.id ?? "none"} group={current}>
+              <AppShell>
+                <MeClient email={user.email ?? ""} />
+              </AppShell>
+            </GroupProvider>
+          );
+        }}
+      </RequireAuth>
+    </Suspense>
   );
 }

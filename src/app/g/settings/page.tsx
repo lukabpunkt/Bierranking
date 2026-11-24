@@ -6,6 +6,8 @@ import { Copy, LogOut, RefreshCw, RotateCcw, Share2, Shield, Trash2, UserMinus }
 import { createClient } from "@/lib/supabase/client";
 import { friendlyError, isUniqueViolation } from "@/lib/errors";
 import { forgetGroup } from "@/lib/lastGroup";
+import { absoluteUrl } from "@/lib/paths";
+import { useSession } from "@/components/SessionProvider";
 import type { Beer, Member } from "@/lib/types";
 import { useGroup } from "@/components/GroupProvider";
 import { Avatar } from "@/components/Avatar";
@@ -17,19 +19,15 @@ import { useToast } from "@/components/Toast";
 export default function SettingsPage() {
   const router = useRouter();
   const toast = useToast();
+  const { reloadGroups } = useSession();
   const { group, setGroup, isAdmin, members, setMembers, me, loading, refresh } = useGroup();
   const [name, setName] = useState(group?.name ?? "");
   const [trash, setTrash] = useState<Beer[] | null>(null);
   const [confirm, setConfirm] = useState<"leave" | "delete" | null>(null);
   const [confirmText, setConfirmText] = useState("");
   const [busy, setBusy] = useState(false);
-  const [origin, setOrigin] = useState("");
-
-  // eslint-disable-next-line react-hooks/set-state-in-effect -- window erst im Browser
-  useEffect(() => setOrigin(window.location.origin), []);
-
   const supabase = createClient();
-  const inviteUrl = group ? `${origin}/join/${group.invite_code}` : "";
+  const inviteUrl = group && typeof window !== "undefined" ? absoluteUrl(`/join/?code=${group.invite_code}`) : "";
 
   const loadTrash = useCallback(async () => {
     if (!group || !isAdmin) return;
@@ -55,7 +53,6 @@ export default function SettingsPage() {
     if (error || !data) return toast({ message: friendlyError(error), tone: "error" });
     setGroup(data);
     toast({ message: "Gruppenname gespeichert" });
-    router.refresh();
   }
 
   async function copy() {
@@ -82,7 +79,7 @@ export default function SettingsPage() {
   async function regenerate() {
     const { data, error } = await supabase.rpc("regenerate_invite_code", { p_group: group!.id });
     if (error || !data) return toast({ message: friendlyError(error), tone: "error" });
-    setGroup({ ...group!, invite_code: data });
+    setGroup();
     toast({ message: "Neuer Link erzeugt – der alte funktioniert nicht mehr." });
   }
 
@@ -121,8 +118,8 @@ export default function SettingsPage() {
     setBusy(false);
     if (error) return toast({ message: friendlyError(error), tone: "error" });
     forgetGroup();
-    router.replace("/groups");
-    router.refresh();
+    await reloadGroups();
+    router.replace("/groups/");
   }
 
   async function deleteGroup() {
@@ -131,8 +128,8 @@ export default function SettingsPage() {
     setBusy(false);
     if (error) return toast({ message: friendlyError(error), tone: "error" });
     forgetGroup();
-    router.replace("/groups");
-    router.refresh();
+    await reloadGroups();
+    router.replace("/groups/");
   }
 
   const sortedMembers = [...members].sort(

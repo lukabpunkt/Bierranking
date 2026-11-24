@@ -1,5 +1,6 @@
 "use client";
 
+import { groupHref } from "@/lib/paths";
 import Link from "next/link";
 import type { Beer } from "@/lib/types";
 import { servingInfo } from "@/lib/servings";
@@ -15,7 +16,7 @@ export function BeerCard({ beer, stats }: { beer: Beer; stats: BeerStats | undef
 
   return (
     <Link
-      href={`/g/${groupId}/beer/${beer.id}`}
+      href={groupHref(groupId!, "beer", { beer: beer.id })}
       className="relative flex items-center gap-3 rounded-2xl bg-card p-3 shadow-sm transition hover:bg-card-2 active:scale-[0.99]"
     >
       <GradeBadge

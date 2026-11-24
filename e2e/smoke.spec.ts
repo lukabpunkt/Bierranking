@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 test("Login-Seite zeigt Magic-Link-Formular", async ({ page }) => {
-  await page.goto("/login");
+  await page.goto("/login/");
   await expect(page.getByRole("heading", { name: "Prost-Zeugnis" })).toBeVisible();
   await expect(page.getByLabel("E-Mail-Adresse")).toBeVisible();
   await expect(page.getByRole("button", { name: /Link senden/ })).toBeDisabled();
@@ -11,19 +11,19 @@ test("Login-Seite zeigt Magic-Link-Formular", async ({ page }) => {
 
 test("Geschützte Seiten leiten zum Login um und merken das Ziel", async ({ page }) => {
   await page.goto("/me");
-  await expect(page).toHaveURL(/\/login\?next=%2Fme/);
+  await expect(page).toHaveURL(/\/login\/\?next=%2Fme/);
   await page.goto("/");
-  await expect(page).toHaveURL(/\/login$/);
+  await expect(page).toHaveURL(/\/login\/?$/);
 });
 
 test("Ungültiger Einladungslink ist ohne Login sichtbar", async ({ page }) => {
-  await page.goto("/join/doesnotexist");
+  await page.goto("/join/?code=doesnotexist");
   await expect(page.getByRole("heading", { name: "Einladung ungültig" })).toBeVisible();
 });
 
 test("Fehlerhafter Auth-Link führt zurück zum Login mit Hinweis", async ({ page }) => {
-  await page.goto("/auth/callback?code=kaputt");
-  await expect(page).toHaveURL(/\/login\?error=link/);
+  await page.goto("/auth/callback/?code=kaputt");
+  await expect(page).toHaveURL(/\/login\/\?error=link/);
   await expect(page.getByText(/ungültig oder abgelaufen/)).toBeVisible();
 });
 
@@ -39,7 +39,7 @@ test("PWA-Manifest und Icons sind erreichbar", async ({ request }) => {
 
 test("Kein horizontales Scrollen auf 375 px", async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 740 });
-  await page.goto("/login");
+  await page.goto("/login/");
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(overflow).toBeLessThanOrEqual(0);
 });

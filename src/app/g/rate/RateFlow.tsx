@@ -1,5 +1,6 @@
 "use client";
 
+import { groupHref } from "@/lib/paths";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -206,7 +207,7 @@ export function RateFlow() {
       },
     });
     await refresh();
-    router.push(`/g/${groupId}/beer/${targetId}`);
+    router.push(groupHref(groupId!, "beer", { beer: targetId }));
   }
 
   return (
@@ -262,7 +263,7 @@ export function RateFlow() {
                     „{dupBeer.name}“ bewerten
                   </Button>
                   <Link
-                    href={`/g/${groupId}/beer/${dupBeer.id}`}
+                    href={groupHref(groupId!, "beer", { beer: dupBeer.id })}
                     className="inline-flex min-h-11 items-center px-2 font-semibold underline"
                   >
                     Ansehen

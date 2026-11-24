@@ -1,5 +1,6 @@
 "use client";
 
+import { groupHref } from "@/lib/paths";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -151,8 +152,7 @@ export function MeClient({ email }: { email: string }) {
   async function signOut() {
     await createClient().auth.signOut();
     forgetGroup();
-    router.replace("/login");
-    router.refresh();
+    router.replace("/login/");
   }
 
   const loadingStats = scope === "all" ? allMine === null : loading;
@@ -286,7 +286,7 @@ export function MeClient({ email }: { email: string }) {
             {list.map((r) => (
               <li key={r.id}>
                 <Link
-                  href={`/g/${r.beer.group_id}/beer/${r.beer_id}`}
+                  href={groupHref(r.beer.group_id, "beer", { beer: r.beer_id })}
                   className="flex min-h-14 items-center gap-3 py-2 hover:opacity-80"
                 >
                   <GradeBadge value={r.grade} size="sm" />
@@ -326,7 +326,7 @@ export function MeClient({ email }: { email: string }) {
         <LogOut size={18} aria-hidden /> Abmelden
       </Button>
       <p className="pb-4 text-center text-xs text-muted">
-        Prost-Zeugnis · <Link href="/groups" className="underline">Meine Gruppen</Link>
+        Prost-Zeugnis · <Link href="/groups/" className="underline">Meine Gruppen</Link>
       </p>
     </div>
   );

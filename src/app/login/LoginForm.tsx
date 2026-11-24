@@ -1,21 +1,25 @@
 "use client";
 
-import { useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
 import { Mail } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { friendlyError, safeNext } from "@/lib/errors";
 import { Button, Card, inputClass } from "@/components/ui";
+import { useSession } from "@/components/SessionProvider";
+import { absoluteUrl } from "@/lib/paths";
 
-function siteUrl() {
-  return process.env.NEXT_PUBLIC_SITE_URL && !process.env.NEXT_PUBLIC_SITE_URL.includes("localhost")
-    ? process.env.NEXT_PUBLIC_SITE_URL.replace(/\/$/, "")
-    : window.location.origin;
-}
 
 export function LoginForm() {
   const params = useSearchParams();
+  const router = useRouter();
+  const { status } = useSession();
   const next = safeNext(params.get("next"));
+
+  // Schon angemeldet → direkt weiter
+  useEffect(() => {
+    if (status === "in") router.replace(next);
+  }, [status, next, router]);
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -24,7 +28,7 @@ export function LoginForm() {
   );
 
   // Erst im Browser berechnen (window gibt es beim Server-Rendering nicht)
-  const callback = () => `${siteUrl()}/auth/callback?next=${encodeURIComponent(next)}`;
+  const callback = () => absoluteUrl(`/auth/callback/?next=${encodeURIComponent(next)}`);
 
   async function sendLink(e: React.FormEvent) {
     e.preventDefault();

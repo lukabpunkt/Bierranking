@@ -5,9 +5,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { friendlyError } from "@/lib/errors";
 import { Button } from "@/components/ui";
+import { useSession } from "@/components/SessionProvider";
+import { groupHref } from "@/lib/paths";
 
 export function JoinButton({ code, auto }: { code: string; auto: boolean }) {
   const router = useRouter();
+  const { reloadGroups } = useSession();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const started = useRef(false);
@@ -21,9 +24,9 @@ export function JoinButton({ code, auto }: { code: string; auto: boolean }) {
       setError(friendlyError(error));
       return;
     }
-    router.replace(`/g/${data}`);
-    router.refresh();
-  }, [code, router]);
+    await reloadGroups();
+    router.replace(groupHref(data));
+  }, [code, router, reloadGroups]);
 
   // Nach dem Login automatisch beitreten.
   useEffect(() => {

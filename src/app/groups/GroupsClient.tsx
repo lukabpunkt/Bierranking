@@ -6,7 +6,8 @@ import { useState } from "react";
 import { ChevronRight, LogIn, Plus, Shield, Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { friendlyError } from "@/lib/errors";
-import type { MyGroup } from "@/lib/session";
+import { useSession, type MyGroup } from "@/components/SessionProvider";
+import { groupHref } from "@/lib/paths";
 import type { Profile } from "@/lib/types";
 import { Avatar } from "@/components/Avatar";
 import { Button, Card, Field, inputClass } from "@/components/ui";
@@ -15,13 +16,14 @@ import { useToast } from "@/components/Toast";
 /** Akzeptiert den reinen Code oder einen kompletten Einladungslink. */
 export function extractInviteCode(input: string): string {
   const trimmed = input.trim();
-  const match = trimmed.match(/\/join\/([A-Za-z0-9]+)/);
+  const match = trimmed.match(/[?&]code=([A-Za-z0-9]+)/) ?? trimmed.match(/\/join\/([A-Za-z0-9]+)/);
   return (match ? match[1] : trimmed).toLowerCase();
 }
 
 export function GroupsClient({ groups, profile, focusNew }: { groups: MyGroup[]; profile: Profile; focusNew: boolean }) {
   const router = useRouter();
   const toast = useToast();
+  const { reloadGroups } = useSession();
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState<"create" | "join" | null>(null);
@@ -30,18 +32,24 @@ export function GroupsClient({ groups, profile, focusNew }: { groups: MyGroup[];
     e.preventDefault();
     setBusy("create");
     const { data, error } = await createClient().rpc("create_group", { p_name: name.trim() });
-    setBusy(null);
-    if (error || !data) return toast({ message: friendlyError(error), tone: "error" });
-    router.push(`/g/${data.id}`);
+    if (error || !data) {
+      setBusy(null);
+      return toast({ message: friendlyError(error), tone: "error" });
+    }
+    await reloadGroups();
+    router.push(groupHref(data.id));
   }
 
   async function join(e: React.FormEvent) {
     e.preventDefault();
     setBusy("join");
     const { data, error } = await createClient().rpc("join_group", { p_code: extractInviteCode(code) });
-    setBusy(null);
-    if (error || !data) return toast({ message: friendlyError(error), tone: "error" });
-    router.push(`/g/${data}`);
+    if (error || !data) {
+      setBusy(null);
+      return toast({ message: friendlyError(error), tone: "error" });
+    }
+    await reloadGroups();
+    router.push(groupHref(data));
   }
 
   return (
@@ -51,7 +59,7 @@ export function GroupsClient({ groups, profile, focusNew }: { groups: MyGroup[];
           <h1 className="text-2xl font-extrabold tracking-tight">Meine Gruppen</h1>
           <p className="text-muted">Hallo {profile.display_name} 👋</p>
         </div>
-        <Link href="/me" aria-label="Mein Profil" className="rounded-full">
+        <Link href="/me/" aria-label="Mein Profil" className="rounded-full">
           <Avatar profile={profile} size="md" />
         </Link>
       </header>
@@ -61,7 +69,7 @@ export function GroupsClient({ groups, profile, focusNew }: { groups: MyGroup[];
           {groups.map((g) => (
             <li key={g.id}>
               <Link
-                href={`/g/${g.id}`}
+                href={groupHref(g.id)}
                 className="flex min-h-16 items-center gap-3 rounded-2xl bg-card p-4 shadow-sm transition hover:bg-card-2"
               >
                 <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-accent/20 text-2xl" aria-hidden>
@@ -128,7 +136,7 @@ export function GroupsClient({ groups, profile, focusNew }: { groups: MyGroup[];
                 value={code}
                 autoCapitalize="none"
                 autoCorrect="off"
-                placeholder="https://…/join/abc123…"
+                placeholder="https://…/join/?code=abc123…"
                 onChange={(e) => setCode(e.target.value)}
               />
             </Field>
