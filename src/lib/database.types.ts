@@ -45,13 +45,6 @@ export type Database = {
             foreignKeyName: "beer_history_beer_id_fkey"
             columns: ["beer_id"]
             isOneToOne: false
-            referencedRelation: "beer_stats"
-            referencedColumns: ["beer_id"]
-          },
-          {
-            foreignKeyName: "beer_history_beer_id_fkey"
-            columns: ["beer_id"]
-            isOneToOne: false
             referencedRelation: "beers"
             referencedColumns: ["id"]
           },
@@ -73,7 +66,6 @@ export type Database = {
           created_at: string
           created_by: string
           deleted_at: string | null
-          group_id: string
           id: string
           name: string
           photo_path: string | null
@@ -88,7 +80,6 @@ export type Database = {
           created_at?: string
           created_by?: string
           deleted_at?: string | null
-          group_id: string
           id?: string
           name: string
           photo_path?: string | null
@@ -103,7 +94,6 @@ export type Database = {
           created_at?: string
           created_by?: string
           deleted_at?: string | null
-          group_id?: string
           id?: string
           name?: string
           photo_path?: string | null
@@ -116,13 +106,6 @@ export type Database = {
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "beers_group_id_fkey"
-            columns: ["group_id"]
-            isOneToOne: false
-            referencedRelation: "groups"
             referencedColumns: ["id"]
           },
         ]
@@ -270,13 +253,6 @@ export type Database = {
             foreignKeyName: "ratings_beer_id_fkey"
             columns: ["beer_id"]
             isOneToOne: false
-            referencedRelation: "beer_stats"
-            referencedColumns: ["beer_id"]
-          },
-          {
-            foreignKeyName: "ratings_beer_id_fkey"
-            columns: ["beer_id"]
-            isOneToOne: false
             referencedRelation: "beers"
             referencedColumns: ["id"]
           },
@@ -310,13 +286,6 @@ export type Database = {
             foreignKeyName: "wishlist_beer_id_fkey"
             columns: ["beer_id"]
             isOneToOne: false
-            referencedRelation: "beer_stats"
-            referencedColumns: ["beer_id"]
-          },
-          {
-            foreignKeyName: "wishlist_beer_id_fkey"
-            columns: ["beer_id"]
-            isOneToOne: false
             referencedRelation: "beers"
             referencedColumns: ["id"]
           },
@@ -331,30 +300,10 @@ export type Database = {
       }
     }
     Views: {
-      beer_stats: {
-        Row: {
-          avg_bottle: number | null
-          avg_can: number | null
-          avg_grade: number | null
-          avg_tap: number | null
-          beer_id: string | null
-          group_id: string | null
-          last_rated_at: string | null
-          rater_count: number | null
-          rating_count: number | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "beers_group_id_fkey"
-            columns: ["group_id"]
-            isOneToOne: false
-            referencedRelation: "groups"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
+      [_ in never]: never
     }
     Functions: {
+      can_access_beer: { Args: { bid: string }; Returns: boolean }
       can_access_photo: { Args: { object_name: string }; Returns: boolean }
       create_group: {
         Args: { p_name: string }

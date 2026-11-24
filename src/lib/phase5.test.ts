@@ -8,7 +8,6 @@ let n = 0;
 const beer = (id: string, extra: Partial<Beer> = {}): Beer => ({
   id,
   name: id.toUpperCase(),
-  group_id: "g",
   brewery: null,
   style: null,
   abv: null,
@@ -98,10 +97,16 @@ describe("Aktivitäts-Feed", () => {
     const edited = { ...rating("tom", "a", 2, "bottle", "2026-01-03T10:00:00Z"), updated_at: "2026-01-04T10:00:00Z" };
     const members: Member[] = [
       { user_id: "tom", role: "member", joined_at: "2026-01-02T10:00:00Z", profile: {} as Member["profile"] },
+      { user_id: "anna", role: "admin", joined_at: "2025-12-01T10:00:00Z", profile: {} as Member["profile"] },
     ];
     const feed = buildFeed(beers, [edited], members);
-    expect(feed.map((f) => f.kind)).toEqual(["rating", "join", "beer"]);
+    expect(feed.map((f) => f.kind)).toEqual(["rating", "join", "beer", "join"]);
     expect(feed[0].kind === "rating" && feed[0].updated).toBe(true);
+  });
+  it("zeigt „neu angelegt“ nur für Biere von Gruppenmitgliedern", () => {
+    const beers = [beer("a", { created_by: "fremd" })];
+    const members: Member[] = [{ user_id: "tom", role: "member", joined_at: "2026-01-02T10:00:00Z", profile: {} as Member["profile"] }];
+    expect(buildFeed(beers, [], members).map((f) => f.kind)).toEqual(["join"]);
   });
   it("relative Zeitangaben", () => {
     const now = new Date("2026-05-10T12:00:00");

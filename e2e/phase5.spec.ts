@@ -95,8 +95,8 @@ test("Etikett-Foto: hochladen, anzeigen, für Nicht-Mitglieder gesperrt", async 
 
   // Nicht-Mitglied C kommt nicht an die Datei
   const a = await apiAs(A, PW);
-  const { data: beer } = await a.from("beers").select("photo_path").eq("group_id", groupId).not("photo_path", "is", null).single();
-  expect(beer?.photo_path).toMatch(new RegExp(`^${groupId}/[0-9a-f-]{36}\\.jpg$`));
+  const { data: beer } = await a.from("beers").select("photo_path").eq("name", "Schneider Weisse Tap 7").single();
+  expect(beer?.photo_path).toMatch(/^[0-9a-f-]{36}\.jpg$/);
   const c = await apiAs(C, PW);
   const { data: leaked, error } = await c.storage.from("beer-photos").download(beer!.photo_path!);
   expect(leaked).toBeNull();
@@ -159,7 +159,7 @@ test("Live: Bewertung von Tom erscheint bei Anna ohne Neuladen", async ({ page, 
   await page.waitForTimeout(2500); // Realtime-Kanal aufbauen lassen
 
   const b = await apiAs(B, PW);
-  const { data: beer } = await b.from("beers").select("id").eq("group_id", groupId).eq("name", "Jever Pilsener").single();
+  const { data: beer } = await b.from("beers").select("id").eq("name", "Jever Pilsener").single();
   const { error } = await b.from("ratings").insert({ beer_id: beer!.id, grade: 3, serving: "tap" });
   expect(error).toBeNull();
 

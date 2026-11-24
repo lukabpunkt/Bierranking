@@ -45,7 +45,10 @@ export function buildFeed(beers: Beer[], ratings: Rating[], members: Member[], l
     const updated = new Date(r.updated_at).getTime() - new Date(r.created_at).getTime() > 60_000;
     items.push({ kind: "rating", at: r.updated_at, userId: r.user_id, beerId: r.beer_id, rating: r, updated });
   }
-  for (const b of beers) items.push({ kind: "beer", at: b.created_at, userId: b.created_by, beerId: b.id });
+  // Biere sind gruppenübergreifend → „neu angelegt“ nur zeigen, wenn es jemand aus der Gruppe war
+  const memberIds = new Set(members.map((m) => m.user_id));
+  for (const b of beers)
+    if (memberIds.has(b.created_by)) items.push({ kind: "beer", at: b.created_at, userId: b.created_by, beerId: b.id });
   for (const m of members) items.push({ kind: "join", at: m.joined_at, userId: m.user_id });
   return items.sort((a, b) => b.at.localeCompare(a.at)).slice(0, limit);
 }
