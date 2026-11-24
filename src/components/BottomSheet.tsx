@@ -2,6 +2,7 @@
 
 import { X } from "lucide-react";
 import { useEffect, useId } from "react";
+import { createPortal } from "react-dom";
 
 export function BottomSheet({
   open,
@@ -28,9 +29,11 @@ export function BottomSheet({
     };
   }, [open, onClose]);
 
-  if (!open) return null;
+  if (!open || typeof document === "undefined") return null;
 
-  return (
+  // Per Portal in <body>: Eltern mit backdrop-filter/transform (z. B. der Header) würden
+  // sonst zum Bezugsrahmen für "fixed" und das Sheet landet außerhalb des Bildschirms.
+  return createPortal(
     <div className="fixed inset-0 z-40 flex items-end justify-center" role="presentation">
       <button
         type="button"
@@ -61,6 +64,7 @@ export function BottomSheet({
         </div>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

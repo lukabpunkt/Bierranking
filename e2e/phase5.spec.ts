@@ -195,3 +195,16 @@ test("Highlights: Aktivität, Hall of Fame/Shame, Abzeichen", async ({ page, con
   await expect(page.getByRole("heading", { name: "Meine Abzeichen" })).toBeVisible();
   await expect(page.getByText("Erste Runde")).toBeVisible();
 });
+
+test("Gruppen-Umschalter im Header öffnet sichtbar und wechselt die Gruppe", async ({ page, context }) => {
+  const a = await apiAs(A, PW);
+  const { data: second } = await a.rpc("create_group", { p_name: "Zweite Runde" });
+  await loginAs(context, A, PW);
+  await page.goto(g());
+  await page.getByRole("button", { name: /Gruppe wechseln/ }).click();
+  const target = page.getByRole("dialog", { name: "Gruppe wechseln" }).getByRole("link", { name: /Zweite Runde/ });
+  await expect(target).toBeInViewport();
+  await target.click();
+  await expect(page).toHaveURL(new RegExp(`id=${second!.id}`));
+  await expect(page.getByText("Noch kein Bier hier – Durst?")).toBeVisible();
+});
