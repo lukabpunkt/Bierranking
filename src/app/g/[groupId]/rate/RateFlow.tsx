@@ -44,6 +44,7 @@ export function RateFlow() {
   const [dupBeer, setDupBeer] = useState<Beer | null>(null);
   const [base, setBase] = useState<number | null>(null);
   const [mod, setMod] = useState<Modifier>("");
+  const [gradeTouched, setGradeTouched] = useState(false);
   const paramServing = params.get("serving");
   const [serving, setServing] = useState<Serving | null>(isServing(paramServing) ? paramServing : null);
   const [more, setMore] = useState(false);
@@ -71,13 +72,16 @@ export function RateFlow() {
   const [lastPrefill, setLastPrefill] = useState("");
   if (prefillKey !== lastPrefill) {
     setLastPrefill(prefillKey);
+    // Nur vorausfüllen, was man in diesem Durchgang noch nicht selbst gesetzt hat
     if (existing) {
-      const parts = partsFromGrade(existing.grade);
-      setBase(parts.base);
-      setMod(parts.mod);
-      setComment(existing.comment ?? "");
-      setLocation(existing.location ?? "");
-      setRatedOn(existing.rated_on);
+      if (!gradeTouched) {
+        const parts = partsFromGrade(existing.grade);
+        setBase(parts.base);
+        setMod(parts.mod);
+      }
+      if (!comment) setComment(existing.comment ?? "");
+      if (!location) setLocation(existing.location ?? "");
+      if (ratedOn === today()) setRatedOn(existing.rated_on);
       if (existing.comment || existing.location) setMore(true);
     }
   }
@@ -340,6 +344,7 @@ export function RateFlow() {
           onChange={(b, m) => {
             setBase(b);
             setMod(m);
+            setGradeTouched(true);
           }}
         />
       </section>

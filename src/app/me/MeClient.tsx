@@ -184,7 +184,7 @@ export function MeClient({ email }: { email: string }) {
                 role="radio"
                 aria-checked={scope === "group"}
                 onClick={() => setScope("group")}
-                className={`min-h-10 max-w-36 truncate rounded-lg px-3 font-semibold ${scope === "group" ? "bg-card shadow-sm" : "text-muted"}`}
+                className={`min-h-10 max-w-28 truncate rounded-lg px-3 font-semibold ${scope === "group" ? "bg-card shadow-sm" : "text-muted"}`}
               >
                 {group?.name}
               </button>
@@ -194,7 +194,7 @@ export function MeClient({ email }: { email: string }) {
               role="radio"
               aria-checked={scope === "all"}
               onClick={() => setScope("all")}
-              className={`min-h-10 rounded-lg px-3 font-semibold ${scope === "all" ? "bg-card shadow-sm" : "text-muted"}`}
+              className={`min-h-10 rounded-lg px-3 font-semibold whitespace-nowrap ${scope === "all" ? "bg-card shadow-sm" : "text-muted"}`}
             >
               Alle Gruppen
             </button>
@@ -230,17 +230,19 @@ export function MeClient({ email }: { email: string }) {
             )}
             <ul className="space-y-2">
               <li className="flex items-center gap-3">
-                <span className="w-32 shrink-0 text-sm text-muted">❤️ Lieblingsbier</span>
+                <span className="w-36 shrink-0 text-sm whitespace-nowrap text-muted">❤️ Lieblingsbier</span>
                 <span className="min-w-0 flex-1 truncate font-semibold">{stats.favorite.beer.name}</span>
                 <GradeBadge value={stats.favorite.grade} size="xs" />
               </li>
+              {stats.hated.id !== stats.favorite.id && stats.hated.grade !== stats.favorite.grade && (
+                <li className="flex items-center gap-3">
+                  <span className="w-36 shrink-0 text-sm whitespace-nowrap text-muted">💀 Hassbier</span>
+                  <span className="min-w-0 flex-1 truncate font-semibold">{stats.hated.beer.name}</span>
+                  <GradeBadge value={stats.hated.grade} size="xs" />
+                </li>
+              )}
               <li className="flex items-center gap-3">
-                <span className="w-32 shrink-0 text-sm text-muted">💀 Hassbier</span>
-                <span className="min-w-0 flex-1 truncate font-semibold">{stats.hated.beer.name}</span>
-                <GradeBadge value={stats.hated.grade} size="xs" />
-              </li>
-              <li className="flex items-center gap-3">
-                <span className="w-32 shrink-0 text-sm text-muted">🏆 Lieblingsgebinde</span>
+                <span className="w-36 shrink-0 text-sm whitespace-nowrap text-muted">🏆 Lieblingsgebinde</span>
                 <span className="font-semibold">
                   {servingInfo(stats.favServing).icon} {servingInfo(stats.favServing).label}
                 </span>
@@ -310,10 +312,10 @@ export function MeClient({ email }: { email: string }) {
         </Button>
         {group && (
           <div className="grid grid-cols-2 gap-2">
-            <Button variant="secondary" onClick={() => exportGroup("csv")} disabled={loading}>
+            <Button variant="secondary" className="px-3 whitespace-nowrap" onClick={() => exportGroup("csv")} disabled={loading}>
               <Download size={18} aria-hidden /> Gruppe CSV
             </Button>
-            <Button variant="secondary" onClick={() => exportGroup("json")} disabled={loading}>
+            <Button variant="secondary" className="px-3 whitespace-nowrap" onClick={() => exportGroup("json")} disabled={loading}>
               <Download size={18} aria-hidden /> Gruppe JSON
             </Button>
           </div>

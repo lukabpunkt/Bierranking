@@ -23,7 +23,8 @@ export function LoginForm() {
     params.get("error") ? "Der Link war ungültig oder abgelaufen. Fordere einfach einen neuen an." : null,
   );
 
-  const callback = `${siteUrl()}/auth/callback?next=${encodeURIComponent(next)}`;
+  // Erst im Browser berechnen (window gibt es beim Server-Rendering nicht)
+  const callback = () => `${siteUrl()}/auth/callback?next=${encodeURIComponent(next)}`;
 
   async function sendLink(e: React.FormEvent) {
     e.preventDefault();
@@ -31,7 +32,7 @@ export function LoginForm() {
     setError(null);
     const { error } = await createClient().auth.signInWithOtp({
       email: email.trim(),
-      options: { emailRedirectTo: callback, shouldCreateUser: true },
+      options: { emailRedirectTo: callback(), shouldCreateUser: true },
     });
     setBusy(false);
     if (error) setError(friendlyError(error, "Der Link konnte nicht gesendet werden."));
@@ -39,7 +40,7 @@ export function LoginForm() {
   }
 
   async function google() {
-    await createClient().auth.signInWithOAuth({ provider: "google", options: { redirectTo: callback } });
+    await createClient().auth.signInWithOAuth({ provider: "google", options: { redirectTo: callback() } });
   }
 
   if (sent) {

@@ -1,0 +1,47 @@
+name: Datenbank-Backup
+
+on:
+  schedule:
+    - cron: "0 3 * * 1" # jeden Montag 03:00 UTC
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: PostgreSQL-Client installieren
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y -qq postgresql-client-17
+
+      - name: Dump erstellen
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          if [ -z "$SUPABASE_DB_URL" ]; then
+            echo "::error::Secret SUPABASE_DB_URL fehlt (Settings → Secrets and variables → Actions)."
+            exit 1
+          fi
+          STAMP=$(date -u +%Y-%m-%d_%H%M)
+          echo "STAMP=$STAMP" >> "$GITHUB_ENV"
+          # Schema public + auth (Nutzerkonten), ohne Rollen/Eigentümer – lässt sich in ein neues Projekt einspielen
+          /usr/lib/postgresql/17/bin/pg_dump "$SUPABASE_DB_URL" \
+            --schema=public --schema=auth \
+            --no-owner --no-privileges --quote-all-identifiers \
+            --file="prost-zeugnis-$STAMP.sql"
+          gzip -9 "prost-zeugnis-$STAMP.sql"
+          ls -lh "prost-zeugnis-$STAMP.sql.gz"
+
+      - name: Als Artifact speichern (90 Tage)
+        uses: actions/upload-artifact@v4
+        with:
+          name: prost-zeugnis-backup-${{ env.STAMP }}
+          path: prost-zeugnis-*.sql.gz
+          retention-days: 90
+          if-no-files-found: error

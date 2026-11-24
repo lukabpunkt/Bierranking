@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="112" fill="#F59E0B"/>
+  <!-- Glas -->
+  <path d="M138 150h196l-18 262a32 32 0 0 1-32 30H188a32 32 0 0 1-32-30z" fill="#FFF7E6"/>
+  <path d="M152 212h168l-13 196a20 20 0 0 1-20 18H185a20 20 0 0 1-20-18z" fill="#FBBF24"/>
+  <!-- Henkel -->
+  <path d="M334 210h34a46 46 0 0 1 46 46v58a46 46 0 0 1-46 46h-40" fill="none" stroke="#FFF7E6" stroke-width="30" stroke-linecap="round"/>
+  <!-- Schaum -->
+  <circle cx="166" cy="150" r="40" fill="#FFFFFF"/>
+  <circle cx="226" cy="128" r="48" fill="#FFFFFF"/>
+  <circle cx="292" cy="146" r="42" fill="#FFFFFF"/>
+  <rect x="138" y="140" width="196" height="50" fill="#FFFFFF"/>
+  <!-- Note -->
+  <text x="236" y="352" text-anchor="middle" font-family="Arial Black, Arial, Helvetica, sans-serif" font-weight="900" font-size="120" fill="#7C2D12">1+</text>
+</svg>

@@ -36,7 +36,9 @@ export function BeerList() {
   const [filterOpen, setFilterOpen] = useState(false);
 
   function update(patch: Partial<Record<"q" | "sort" | "serving" | "style" | "mine" | "by", string | null>>) {
-    const next = new URLSearchParams(params.toString());
+    // Immer vom aktuellen URL-Stand ausgehen (nicht vom Render-Stand) – sonst überschreibt
+    // die verzögerte Suche eine zwischenzeitlich gewählte Sortierung.
+    const next = new URLSearchParams(window.location.search);
     for (const [k, v] of Object.entries(patch)) {
       if (v === null || v === "" || (k === "sort" && v === "best")) next.delete(k);
       else next.set(k, v);
@@ -112,15 +114,10 @@ export function BeerList() {
       </div>
 
       {anyHidden && beers.length > 0 && (
-        <div className="mb-3 flex items-center justify-between gap-3 rounded-2xl bg-card-2 px-4 py-2 text-sm">
-          <span className="text-muted">
-            {gradeSort ? (
-              <span className="inline-flex items-center gap-1.5">
-                <Info size={16} aria-hidden /> Achtung: Die Reihenfolge verrät die Noten.
-              </span>
-            ) : (
-              "Fremde Noten sind verdeckt."
-            )}
+        <div className="mb-3 flex items-center gap-2 rounded-2xl bg-card-2 py-1 pr-1 pl-4 text-sm">
+          {gradeSort && <Info size={16} className="shrink-0 text-muted" aria-hidden />}
+          <span className="min-w-0 flex-1 text-muted">
+            {gradeSort ? "Die Reihenfolge verrät die Noten." : "Fremde Noten sind verdeckt."}
           </span>
           <Button variant="ghost" className="min-h-11 shrink-0 px-3 text-sm" onClick={revealAll}>
             <Eye size={16} aria-hidden /> Alle aufdecken

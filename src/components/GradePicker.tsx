@@ -18,6 +18,7 @@ export function GradePicker({
   onChange: (base: number, mod: Modifier) => void;
 }) {
   const value = base ? gradeFromParts(base, mod) : null;
+  // Eine neue Ziffer setzt die Tendenz bewusst auf „glatt“ zurück (erst Ziffer, dann +/−).
 
   return (
     <div className="space-y-3">
@@ -32,7 +33,7 @@ export function GradePicker({
               role="radio"
               aria-checked={active}
               aria-label={`Note ${n}`}
-              onClick={() => onChange(n, n === 6 ? "" : mod)}
+              onClick={() => onChange(n, "")}
               className={`tabular flex h-14 items-center justify-center rounded-2xl text-2xl font-extrabold transition active:scale-95 ${
                 active ? "scale-105 ring-4 ring-fg/80" : "opacity-80 hover:opacity-100"
               }`}
