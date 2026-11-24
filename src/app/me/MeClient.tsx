@@ -2,7 +2,6 @@
 
 import { groupHref } from "@/lib/paths";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { Download, LogOut, Search } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -11,6 +10,7 @@ import { servingInfo, SERVINGS } from "@/lib/servings";
 import { downloadFile, slug, toCsv } from "@/lib/export";
 import { matchesQuery } from "@/lib/search";
 import { forgetGroup } from "@/lib/lastGroup";
+import { absoluteUrl } from "@/lib/paths";
 import type { Beer, Rating, Serving } from "@/lib/types";
 import { useGroup } from "@/components/GroupProvider";
 import { ProfileForm } from "@/components/ProfileForm";
@@ -27,7 +27,6 @@ function formatDate(d: string) {
 }
 
 export function MeClient({ email }: { email: string }) {
-  const router = useRouter();
   const { me, setMe, group, groups, groupId, members, beers, ratings, loading, hideGrades, setHideGrades } = useGroup();
   const [scope, setScope] = useState<"group" | "all">(groupId ? "group" : "all");
   const [allMine, setAllMine] = useState<MyRating[] | null>(null);
@@ -151,9 +150,10 @@ export function MeClient({ email }: { email: string }) {
   }
 
   async function signOut() {
-    await createClient().auth.signOut();
     forgetGroup();
-    router.replace("/login/");
+    await createClient().auth.signOut();
+    // Harter Seitenwechsel: sonst leitet der Seitenschutz zuerst auf /login/?next=/me/ um
+    window.location.replace(absoluteUrl("/login/"));
   }
 
   const loadingStats = scope === "all" ? allMine === null : loading;
