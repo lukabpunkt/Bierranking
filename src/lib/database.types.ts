@@ -289,6 +289,46 @@ export type Database = {
           },
         ]
       }
+      wishlist: {
+        Row: {
+          beer_id: string
+          created_at: string
+          user_id: string
+        }
+        Insert: {
+          beer_id: string
+          created_at?: string
+          user_id?: string
+        }
+        Update: {
+          beer_id?: string
+          created_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wishlist_beer_id_fkey"
+            columns: ["beer_id"]
+            isOneToOne: false
+            referencedRelation: "beer_stats"
+            referencedColumns: ["beer_id"]
+          },
+          {
+            foreignKeyName: "wishlist_beer_id_fkey"
+            columns: ["beer_id"]
+            isOneToOne: false
+            referencedRelation: "beers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wishlist_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       beer_stats: {
@@ -315,6 +355,7 @@ export type Database = {
       }
     }
     Functions: {
+      can_access_photo: { Args: { object_name: string }; Returns: boolean }
       create_group: {
         Args: { p_name: string }
         Returns: {

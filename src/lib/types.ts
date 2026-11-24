@@ -4,6 +4,7 @@ export type Profile = Tables<"profiles">;
 export type Group = Tables<"groups">;
 export type Beer = Tables<"beers">;
 export type Rating = Tables<"ratings">;
+export type WishlistEntry = Tables<"wishlist">;
 export type Serving = Enums<"serving_type">;
 export type Role = "admin" | "member";
 

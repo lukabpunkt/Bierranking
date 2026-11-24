@@ -2,6 +2,7 @@
 
 import { groupHref } from "@/lib/paths";
 import Link from "next/link";
+import { Bookmark } from "lucide-react";
 import type { Beer } from "@/lib/types";
 import { servingInfo } from "@/lib/servings";
 import { GradeBadge } from "./GradeBadge";
@@ -9,7 +10,9 @@ import { AvatarStack } from "./Avatar";
 import { useGroup, type BeerStats } from "./GroupProvider";
 
 export function BeerCard({ beer, stats }: { beer: Beer; stats: BeerStats | undefined }) {
-  const { groupId, isHidden, reveal, profileOf, wasJustRevealed } = useGroup();
+  const { groupId, isHidden, reveal, profileOf, wasJustRevealed, photoUrls, isWished } = useGroup();
+  const photo = photoUrls.get(beer.id);
+  const wished = isWished(beer.id);
   const hidden = isHidden(beer.id);
   const sub = [beer.brewery, beer.style].filter(Boolean).join(" · ");
   const count = stats?.count ?? 0;
@@ -46,8 +49,22 @@ export function BeerCard({ beer, stats }: { beer: Beer; stats: BeerStats | undef
           </span>
         </div>
       </div>
+      {photo && (
+        // eslint-disable-next-line @next/next/no-img-element -- signierte Storage-URL
+        <img src={photo} alt="" className="h-14 w-14 shrink-0 rounded-xl object-cover" loading="lazy" />
+      )}
+      {wished && (
+        <Bookmark
+          size={16}
+          className="absolute right-3 bottom-3 fill-accent text-accent-strong"
+          aria-label="Auf deiner Wunschliste"
+        />
+      )}
       {!stats?.myRated && (
-        <span className="absolute top-3 right-3 h-2.5 w-2.5 rounded-full bg-accent" aria-label="Von dir noch nicht bewertet" />
+        <span
+          className="absolute top-2.5 right-2.5 h-2.5 w-2.5 rounded-full bg-accent ring-2 ring-card"
+          aria-label="Von dir noch nicht bewertet"
+        />
       )}
     </Link>
   );

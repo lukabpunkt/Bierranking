@@ -15,6 +15,8 @@ import type { Beer, Rating, Serving } from "@/lib/types";
 import { useGroup } from "@/components/GroupProvider";
 import { ProfileForm } from "@/components/ProfileForm";
 import { PasswordForm } from "@/components/PasswordForm";
+import { BadgeGrid } from "@/components/BadgeGrid";
+import { computeBadges } from "@/lib/badges";
 import { GradeBadge } from "@/components/GradeBadge";
 import { Button, Card, Chip, Switch, inputClass } from "@/components/ui";
 import { SkeletonBlock } from "@/components/Skeleton";
@@ -79,6 +81,8 @@ export function MeClient({ email }: { email: string }) {
     }
     return { avg, count: mine.length, beerCount, favorite, hated, favServing: counts[0].s as Serving, stricter };
   }, [mine, members, ratings, me.id, scope]);
+
+  const myBadges = useMemo(() => computeBadges(me.id, ratings, beers), [me.id, ratings, beers]);
 
   const list = useMemo(() => {
     const filtered = mine.filter((r) => matchesQuery(r.beer, query));
@@ -252,6 +256,24 @@ export function MeClient({ email }: { email: string }) {
           </>
         )}
       </Card>
+
+      {groupId && (
+        <Card className="space-y-3">
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="text-lg font-bold">Meine Abzeichen</h2>
+            <Link
+              href={groupHref(groupId, "highlights", { tab: "badges" })}
+              className="inline-flex min-h-11 items-center text-sm font-semibold underline"
+            >
+              Alle ansehen
+            </Link>
+          </div>
+          {loading ? <SkeletonBlock className="h-24" /> : <BadgeGrid badges={myBadges.filter((b) => b.earned).length ? myBadges.filter((b) => b.earned) : myBadges.slice(0, 4)} />}
+          {!loading && myBadges.every((b) => !b.earned) && (
+            <p className="text-sm text-muted">Noch keins – bewerte dein erstes Bier! 🍺</p>
+          )}
+        </Card>
+      )}
 
       <Card className="space-y-3">
         <h2 className="text-lg font-bold">Meine Bewertungen</h2>

@@ -6,7 +6,7 @@ export function asset(path: string) {
   return `${BASE_PATH}${path}`;
 }
 
-type Sub = "" | "rate" | "beer" | "compare" | "settings";
+type Sub = "" | "rate" | "beer" | "compare" | "settings" | "highlights";
 
 /** Link innerhalb einer Gruppe, z. B. groupHref(id, "beer", { beer: x }) → /g/beer/?id=…&beer=… */
 export function groupHref(groupId: string, sub: Sub = "", extra: Record<string, string | null | undefined> = {}) {

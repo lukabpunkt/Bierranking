@@ -2,7 +2,7 @@
 
 import { groupHref } from "@/lib/paths";
 import Link from "next/link";
-import { Eye, EyeOff, Settings } from "lucide-react";
+import { Eye, EyeOff, Settings, Trophy } from "lucide-react";
 import { BottomNav } from "./BottomNav";
 import { GroupSwitcher } from "./GroupSwitcher";
 import { useGroup } from "./GroupProvider";
@@ -28,6 +28,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               >
                 {hideGrades ? <EyeOff size={22} aria-hidden /> : <Eye size={22} aria-hidden />}
               </button>
+              <Link
+                href={groupHref(groupId, "highlights")}
+                aria-label="Highlights: Aktivität, Hall of Fame, Abzeichen"
+                title="Highlights"
+                className="flex h-11 w-11 items-center justify-center rounded-full text-muted transition hover:bg-card-2"
+              >
+                <Trophy size={22} aria-hidden />
+              </Link>
               <Link
                 href={groupHref(groupId, "settings")}
                 aria-label="Gruppeneinstellungen"

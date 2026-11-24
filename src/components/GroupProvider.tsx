@@ -3,11 +3,12 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { average } from "@/lib/grades";
-import type { Beer, Group, Member, Profile, Rating, Role, Serving } from "@/lib/types";
+import type { Beer, Group, Member, Profile, Rating, Role, Serving, WishlistEntry } from "@/lib/types";
 import { unknownProfile } from "@/lib/types";
 import { useSession, type MyGroup } from "./SessionProvider";
 import { useRevealed } from "@/hooks/useRevealed";
 import { rememberGroup } from "@/lib/lastGroup";
+import { useToast } from "./Toast";
 
 export type BeerStats = {
   avg: number | null;
@@ -46,6 +47,14 @@ type Ctx = {
   revealAll: () => void;
   allRevealed: boolean;
   wasJustRevealed: (beerId: string) => boolean;
+  /** Wunschliste aller Mitglieder dieser Gruppe */
+  wishlist: WishlistEntry[];
+  isWished: (beerId: string) => boolean;
+  toggleWish: (beerId: string) => Promise<void>;
+  /** Signierte URLs der Etikett-Fotos (beerId → URL) */
+  photoUrls: Map<string, string>;
+  /** true, solange die Live-Verbindung steht */
+  live: boolean;
 };
 
 const GroupContext = createContext<Ctx | null>(null);
@@ -88,6 +97,10 @@ export function GroupProvider({ group: groupProp, children }: { group: MyGroup |
   const [members, setMembers] = useState<Member[]>([]);
   const [beers, setBeers] = useState<Beer[]>([]);
   const [ratings, setRatings] = useState<Rating[]>([]);
+  const [wishlist, setWishlist] = useState<WishlistEntry[]>([]);
+  const [photoUrls, setPhotoUrls] = useState<Map<string, string>>(new Map());
+  const [live, setLive] = useState(false);
+  const toast = useToast();
   const [loading, setLoading] = useState(!!groupId);
   const [loadError, setLoadError] = useState<string | null>(null);
   const revealedState = useRevealed(groupId);
@@ -98,7 +111,7 @@ export function GroupProvider({ group: groupProp, children }: { group: MyGroup |
     const seq = ++loadSeq.current;
     const supabase = createClient();
     try {
-      const [memberRows, beerRows, ratingRows] = await Promise.all([
+      const [memberRows, beerRows, ratingRows, wishRows] = await Promise.all([
         fetchAll((from, to) =>
           supabase
             .from("group_members")
@@ -124,6 +137,13 @@ export function GroupProvider({ group: groupProp, children }: { group: MyGroup |
             .order("created_at")
             .range(from, to),
         ),
+        fetchAll((from, to) =>
+          supabase
+            .from("wishlist")
+            .select("*, beers!inner(group_id)")
+            .eq("beers.group_id", groupId)
+            .range(from, to),
+        ),
       ]);
       if (seq !== loadSeq.current) return;
       setMembers(
@@ -142,6 +162,27 @@ export function GroupProvider({ group: groupProp, children }: { group: MyGroup |
           return { ...rest, grade: Number(rest.grade) } as Rating;
         }),
       );
+      setWishlist(
+        wishRows.map((w) => ({ beer_id: w.beer_id, user_id: w.user_id, created_at: w.created_at })),
+      );
+      // Etikett-Fotos: signierte URLs (1 Std. gültig) für alle Biere mit Foto
+      const withPhoto = beerRows.filter((b) => b.photo_path);
+      if (withPhoto.length) {
+        const { data: signed } = await supabase.storage
+          .from("beer-photos")
+          .createSignedUrls(withPhoto.map((b) => b.photo_path!), 3600);
+        if (seq === loadSeq.current) {
+          const map = new Map<string, string>();
+          withPhoto.forEach((b, i) => {
+            const url = signed?.[i]?.signedUrl;
+            // updated_at als Cache-Bremse, damit ein ersetztes Foto sofort neu geladen wird
+            if (url) map.set(b.id, `${url}&v=${encodeURIComponent(b.updated_at)}`);
+          });
+          setPhotoUrls(map);
+        }
+      } else {
+        setPhotoUrls(new Map());
+      }
       setLoadError(null);
     } catch (e) {
       if (seq === loadSeq.current) setLoadError(e instanceof Error ? e.message : "Fehler beim Laden");
@@ -162,6 +203,41 @@ export function GroupProvider({ group: groupProp, children }: { group: MyGroup |
   useEffect(() => {
     if (groupId) rememberGroup(groupId);
   }, [groupId]);
+
+  // Live-Updates: Änderungen anderer erscheinen ohne Neuladen.
+  // Realtime liefert nur Zeilen, die man laut RLS sehen darf; danach wird einfach neu geladen.
+  const membersRef = useRef<Member[]>([]);
+  useEffect(() => {
+    membersRef.current = members;
+  }, [members]);
+
+  useEffect(() => {
+    if (!groupId) return;
+    const supabase = createClient();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const schedule = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => void refresh(), 400);
+    };
+    const channel = supabase
+      .channel(`group-${groupId}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "beers", filter: `group_id=eq.${groupId}` }, schedule)
+      .on("postgres_changes", { event: "*", schema: "public", table: "group_members", filter: `group_id=eq.${groupId}` }, schedule)
+      .on("postgres_changes", { event: "*", schema: "public", table: "wishlist" }, schedule)
+      .on("postgres_changes", { event: "*", schema: "public", table: "ratings" }, (payload) => {
+        schedule();
+        const row = payload.new as Partial<Rating> | undefined;
+        if (payload.eventType === "INSERT" && row?.user_id && row.user_id !== me.id) {
+          const who = membersRef.current.find((m) => m.user_id === row.user_id)?.profile;
+          if (who) toast({ message: `${who.emoji} ${who.display_name} hat gerade ein Bier bewertet` });
+        }
+      })
+      .subscribe((status) => setLive(status === "SUBSCRIBED"));
+    return () => {
+      clearTimeout(timer);
+      void supabase.removeChannel(channel);
+    };
+  }, [groupId, refresh, me.id, toast]);
 
   const profileMap = useMemo(() => {
     const m = new Map<string, Profile>();
@@ -216,6 +292,27 @@ export function GroupProvider({ group: groupProp, children }: { group: MyGroup |
     [me.hide_grades, isRevealed, stats],
   );
 
+  const isWished = useCallback(
+    (beerId: string) => wishlist.some((w) => w.beer_id === beerId && w.user_id === me.id),
+    [wishlist, me.id],
+  );
+
+  const toggleWish = useCallback(
+    async (beerId: string) => {
+      const supabase = createClient();
+      if (isWished(beerId)) {
+        setWishlist((w) => w.filter((x) => !(x.beer_id === beerId && x.user_id === me.id)));
+        const { error } = await supabase.from("wishlist").delete().eq("beer_id", beerId).eq("user_id", me.id);
+        if (error) await refresh();
+      } else {
+        setWishlist((w) => [...w, { beer_id: beerId, user_id: me.id, created_at: new Date().toISOString() }]);
+        const { error } = await supabase.from("wishlist").insert({ beer_id: beerId, user_id: me.id });
+        if (error) await refresh();
+      }
+    },
+    [isWished, me.id, refresh],
+  );
+
   const value: Ctx = {
     groupId,
     group,
@@ -242,6 +339,11 @@ export function GroupProvider({ group: groupProp, children }: { group: MyGroup |
     revealAll,
     allRevealed,
     wasJustRevealed,
+    wishlist,
+    isWished,
+    toggleWish,
+    photoUrls,
+    live,
   };
 
   return <GroupContext.Provider value={value}>{children}</GroupContext.Provider>;

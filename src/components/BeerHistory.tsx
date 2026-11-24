@@ -15,6 +15,8 @@ const FIELDS: Record<string, string> = {
   style: "Sorte",
   abv: "Alkohol %",
   country: "Land",
+  barcode: "Barcode",
+  photo_path: "Foto",
   deleted_at: "Gelöscht",
 };
 
@@ -59,6 +61,8 @@ export function BeerHistory({ beerId }: { beerId: string }) {
               {changes.map((k) =>
                 k === "deleted_at" ? (
                   <li key={k}>{newD[k] ? "🗑️ gelöscht" : "♻️ wiederhergestellt"}</li>
+                ) : k === "photo_path" ? (
+                  <li key={k}>{newD[k] ? "📸 Foto hinzugefügt / ersetzt" : "🖼️ Foto entfernt"}</li>
                 ) : (
                   <li key={k}>
                     <span className="font-semibold">{FIELDS[k]}:</span>{" "}

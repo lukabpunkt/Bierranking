@@ -17,7 +17,7 @@ export type ListFilters = {
   sort: SortKey;
   servings: Serving[];
   style: string | null;
-  mine: "rated" | "unrated" | null;
+  mine: "rated" | "unrated" | "wish" | null;
   by: string | null;
 };
 

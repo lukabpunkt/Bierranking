@@ -3,9 +3,9 @@
 import { STYLES } from "@/lib/servings";
 import { Chip, Field, inputClass } from "./ui";
 
-export type BeerDraft = { name: string; brewery: string; style: string; abv: string; country: string };
+export type BeerDraft = { name: string; brewery: string; style: string; abv: string; country: string; barcode?: string };
 
-export const emptyDraft = (name = ""): BeerDraft => ({ name, brewery: "", style: "", abv: "", country: "" });
+export const emptyDraft = (name = ""): BeerDraft => ({ name, brewery: "", style: "", abv: "", country: "", barcode: "" });
 
 export function draftToRow(d: BeerDraft) {
   const abv = d.abv.trim() ? Number(d.abv.replace(",", ".")) : null;
@@ -15,6 +15,7 @@ export function draftToRow(d: BeerDraft) {
     style: d.style.trim() || null,
     abv: abv !== null && Number.isFinite(abv) ? Math.round(abv * 10) / 10 : null,
     country: d.country.trim() || null,
+    barcode: d.barcode?.trim() || null,
   };
 }
 
@@ -55,6 +56,16 @@ export function BeerForm({ draft, onChange }: { draft: BeerDraft; onChange: (d: 
           ))}
         </div>
       </div>
+      {draft.barcode && (
+        <p className="flex items-center justify-between gap-2 rounded-2xl bg-card-2 px-4 py-2 text-sm">
+          <span>
+            <span className="text-muted">Barcode</span> <span className="tabular font-semibold">{draft.barcode}</span>
+          </span>
+          <button type="button" className="min-h-11 px-2 text-muted underline" onClick={() => set({ barcode: "" })}>
+            entfernen
+          </button>
+        </p>
+      )}
       <div className="grid grid-cols-2 gap-3">
         <Field label="Alkohol %">
           <input

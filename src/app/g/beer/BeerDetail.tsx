@@ -16,6 +16,8 @@ import { Avatar } from "@/components/Avatar";
 import { BottomSheet } from "@/components/BottomSheet";
 import { BeerForm, draftToRow, draftValid, type BeerDraft } from "@/components/BeerForm";
 import { BeerHistory } from "@/components/BeerHistory";
+import { BeerPhoto } from "@/components/BeerPhoto";
+import { WishButton } from "@/components/WishButton";
 import { Button, ButtonLink, Card, EmptyState } from "@/components/ui";
 import { SkeletonBlock } from "@/components/Skeleton";
 import { useToast } from "@/components/Toast";
@@ -179,6 +181,10 @@ export function BeerDetail({ beerId }: { beerId: string }) {
           </div>
         </div>
       </Card>
+
+      <WishButton beerId={beerId} />
+
+      <BeerPhoto beer={beer} />
 
       <div className="grid grid-cols-3 gap-2">
         {SERVINGS.map((sv) => {

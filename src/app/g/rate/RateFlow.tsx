@@ -3,8 +3,8 @@
 import { groupHref } from "@/lib/paths";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
-import { ChevronDown, Plus, Search, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Bookmark, ChevronDown, Plus, ScanBarcode, Search, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { gradeFromParts, gradeLabel, partsFromGrade, type Modifier } from "@/lib/grades";
 import { duplicateKey, rankByRelevance } from "@/lib/search";
@@ -17,6 +17,8 @@ import { ServingPicker } from "@/components/ServingPicker";
 import { BeerForm, draftToRow, draftValid, emptyDraft, type BeerDraft } from "@/components/BeerForm";
 import { Button, Field, inputClass } from "@/components/ui";
 import { useToast } from "@/components/Toast";
+import { BarcodeScanner } from "@/components/BarcodeScanner";
+import { lookupBarcode, type ProductSuggestion } from "@/lib/openFoodFacts";
 
 const LAST_SERVING_KEY = "pz_last_serving";
 
@@ -53,6 +55,8 @@ export function RateFlow() {
   const [location, setLocation] = useState("");
   const [ratedOn, setRatedOn] = useState(today());
   const [saving, setSaving] = useState(false);
+  const [scanOpen, setScanOpen] = useState(false);
+  const [lookingUp, setLookingUp] = useState(false);
 
   // Zuletzt genutztes Gebinde vorauswählen (localStorage gibt es nur im Browser)
   useEffect(() => {
@@ -108,6 +112,86 @@ export function RateFlow() {
     setDupBeer(null);
   }
 
+  /** Legt das Bier aus dem Formular an. Bei Duplikat: Hinweis + null. */
+  async function createBeerFromDraft(): Promise<string | null> {
+    if (!draft) return null;
+    const supabase = createClient();
+    const row = draftToRow(draft);
+    const local = beers.find((b) => duplicateKey(b.name, b.brewery) === duplicateKey(row.name, row.brewery));
+    if (local) {
+      setDupBeer(local);
+      setSaving(false);
+      return null;
+    }
+    const { data, error } = await supabase
+      .from("beers")
+      .insert({ ...row, group_id: groupId!, created_by: me.id })
+      .select()
+      .single();
+    if (error || !data) {
+      setSaving(false);
+      if (isUniqueViolation(error)) {
+        await refresh();
+        const { data: found } = await supabase
+          .from("beers")
+          .select("*")
+          .eq("group_id", groupId!)
+          .is("deleted_at", null)
+          .ilike("name", row.name.replace(/[%_]/g, "\\$&"));
+        const match = (found ?? []).find((b) => duplicateKey(b.name, b.brewery) === duplicateKey(row.name, row.brewery));
+        setDupBeer(match ?? null);
+        if (!match) toast({ message: "Das Bier gibt es schon", tone: "error" });
+        return null;
+      }
+      toast({ message: friendlyError(error), tone: "error" });
+      return null;
+    }
+    return data.id;
+  }
+
+  /** Neues Bier nur merken („Will ich probieren“), ohne Note. */
+  async function saveToWishlist() {
+    if (!draft || !draftValid(draft) || saving) return;
+    setSaving(true);
+    const id = await createBeerFromDraft();
+    if (!id) return;
+    await createClient().from("wishlist").insert({ beer_id: id, user_id: me.id });
+    await refresh();
+    toast({ message: "Auf deine Wunschliste gesetzt 🔖" });
+    router.push(groupHref(groupId!, "beer", { beer: id }));
+  }
+
+  /** Barcode gescannt: vorhandenes Bier wählen oder Daten von Open Food Facts holen. */
+  const onScanned = useCallback(
+    async (code: string) => {
+      setScanOpen(false);
+      const known = beers.find((b) => b.barcode === code);
+      if (known) {
+        chooseBeer(known.id);
+        toast({ message: `Gefunden: ${known.name}` });
+        return;
+      }
+      setLookingUp(true);
+      let suggestion: ProductSuggestion | null = null;
+      try {
+        suggestion = await lookupBarcode(code);
+      } catch {
+        suggestion = null;
+      }
+      setLookingUp(false);
+      setBeerId(null);
+      setDupBeer(null);
+      if (suggestion) {
+        setDraft({ ...emptyDraft(), ...suggestion });
+        toast({ message: "Daten von Open Food Facts übernommen – bitte kurz prüfen" });
+      } else {
+        setDraft({ ...emptyDraft(query.trim()), barcode: code });
+        toast({ message: "Barcode nicht gefunden – bitte Namen eintragen" });
+      }
+    },
+    [beers, query, toast],
+  );
+
   async function save() {
     if (!canSave || !serving || base === null) return;
     setSaving(true);
@@ -115,37 +199,9 @@ export function RateFlow() {
     let targetId = beer?.id ?? null;
 
     if (!targetId && draft) {
-      const row = draftToRow(draft);
-      const local = beers.find((b) => duplicateKey(b.name, b.brewery) === duplicateKey(row.name, row.brewery));
-      if (local) {
-        setDupBeer(local);
-        setSaving(false);
-        return;
-      }
-      const { data, error } = await supabase
-        .from("beers")
-        .insert({ ...row, group_id: groupId!, created_by: me.id })
-        .select()
-        .single();
-      if (error || !data) {
-        setSaving(false);
-        if (isUniqueViolation(error)) {
-          await refresh();
-          const { data: found } = await supabase
-            .from("beers")
-            .select("*")
-            .eq("group_id", groupId!)
-            .is("deleted_at", null)
-            .ilike("name", row.name.replace(/[%_]/g, "\\$&"));
-          const match = (found ?? []).find((b) => duplicateKey(b.name, b.brewery) === duplicateKey(row.name, row.brewery));
-          setDupBeer(match ?? null);
-          if (!match) toast({ message: "Das Bier gibt es schon", tone: "error" });
-          return;
-        }
-        toast({ message: friendlyError(error), tone: "error" });
-        return;
-      }
-      targetId = data.id;
+      const id = await createBeerFromDraft();
+      if (!id) return;
+      targetId = id;
     }
 
     const grade = gradeFromParts(base, mod);
@@ -255,6 +311,14 @@ export function RateFlow() {
               </button>
             </div>
             <BeerForm draft={draft} onChange={setDraft} />
+            <Button
+              variant="secondary"
+              className="w-full"
+              disabled={!draftValid(draft) || saving}
+              onClick={saveToWishlist}
+            >
+              <Bookmark size={18} aria-hidden /> Nur auf die Wunschliste (noch nicht probiert)
+            </Button>
             {dupBeer && (
               <div className="rounded-2xl bg-card-2 p-3 text-sm" role="alert">
                 <p className="font-bold">Das Bier gibt es schon.</p>
@@ -274,18 +338,31 @@ export function RateFlow() {
           </div>
         ) : (
           <div className="space-y-2">
-            <div className="relative">
-              <Search className="pointer-events-none absolute top-1/2 left-4 -translate-y-1/2 text-muted" size={20} aria-hidden />
-              <input
-                type="search"
-                value={query}
-                autoFocus={!params.get("beer")}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Bier suchen oder neu eingeben"
-                aria-label="Bier suchen"
-                className={`${inputClass} pl-11`}
-              />
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <Search className="pointer-events-none absolute top-1/2 left-4 -translate-y-1/2 text-muted" size={20} aria-hidden />
+                <input
+                  type="search"
+                  value={query}
+                  autoFocus={!params.get("beer")}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Bier suchen oder neu eingeben"
+                  aria-label="Bier suchen"
+                  className={`${inputClass} pl-11`}
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => setScanOpen(true)}
+                disabled={lookingUp}
+                aria-label="Barcode scannen"
+                title="Barcode scannen"
+                className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-line bg-card hover:bg-card-2 disabled:opacity-50"
+              >
+                <ScanBarcode size={22} aria-hidden />
+              </button>
             </div>
+            {lookingUp && <p className="px-1 text-sm text-muted" role="status">Suche Produkt …</p>}
             {!query.trim() && suggestions.length > 0 && <p className="px-1 text-xs text-muted">Zuletzt hinzugefügt</p>}
             <ul className="space-y-1.5">
               {loading && beers.length === 0 && <li className="px-1 text-sm text-muted">Lade Biere …</li>}
@@ -412,6 +489,8 @@ export function RateFlow() {
           </Button>
         </div>
       </div>
+      {/* Bei jedem Öffnen frisch (Kamera, Eingabefeld) */}
+      {scanOpen && <BarcodeScanner open onClose={() => setScanOpen(false)} onDetected={onScanned} />}
     </div>
   );
 }

@@ -22,7 +22,7 @@ function parseFilters(params: URLSearchParams): ListFilters {
     sort: sort && SORTS.some((s) => s.key === sort) ? sort : "best",
     servings: (params.get("serving") ?? "").split(",").filter(isServing),
     style: params.get("style"),
-    mine: mine === "rated" || mine === "unrated" ? mine : null,
+    mine: mine === "rated" || mine === "unrated" || mine === "wish" ? mine : null,
     by: params.get("by"),
   };
 }
@@ -32,7 +32,7 @@ export function BeerList() {
   const pathname = usePathname();
   const params = useSearchParams();
   const filters = useMemo(() => parseFilters(new URLSearchParams(params.toString())), [params]);
-  const { groupId, beers, stats, loading, loadError, members, hideGrades, revealAll, allRevealed, refresh } = useGroup();
+  const { groupId, beers, stats, loading, loadError, members, hideGrades, revealAll, allRevealed, refresh, isWished } = useGroup();
   const [query, setQuery] = useState(filters.q);
   const [filterOpen, setFilterOpen] = useState(false);
 
@@ -58,7 +58,11 @@ export function BeerList() {
 
   // Lokale Suche sofort anwenden, URL folgt
   const effective = useMemo(() => ({ ...filters, q: query }), [filters, query]);
-  const list = useMemo(() => filterAndSort(beers, stats, effective), [beers, stats, effective]);
+  const list = useMemo(() => {
+    // Wunschliste ist ein Sonderfall des „Meine“-Filters
+    const base = effective.mine === "wish" ? beers.filter((b) => isWished(b.id)) : beers;
+    return filterAndSort(base, stats, { ...effective, mine: effective.mine === "wish" ? null : effective.mine });
+  }, [beers, stats, effective, isWished]);
 
   const styles = useMemo(
     () => [...new Set(beers.map((b) => b.style).filter((s): s is string => !!s))].sort((a, b) => a.localeCompare(b, "de")),
@@ -191,6 +195,9 @@ export function BeerList() {
                 onClick={() => update({ mine: filters.mine === "unrated" ? null : "unrated" })}
               >
                 Noch nicht von mir bewertet
+              </Chip>
+              <Chip active={filters.mine === "wish"} onClick={() => update({ mine: filters.mine === "wish" ? null : "wish" })}>
+                🔖 Meine Wunschliste
               </Chip>
             </div>
           </section>
