@@ -111,56 +111,40 @@ export function GroupProvider({ group: groupProp, children }: { group: MyGroup |
     const seq = ++loadSeq.current;
     const supabase = createClient();
     try {
-      // 1) Mitglieder der Gruppe
-      const memberRows = await fetchAll((from, to) =>
-        supabase
-          .from("group_members")
-          .select("user_id, role, joined_at, profiles(*)")
-          .eq("group_id", groupId)
-          .range(from, to),
-      );
-      const memberIds = memberRows.map((m) => m.user_id);
-
-      // 2) Bewertungen + Wunschlisten dieser Personen (gehören der Person, nicht der Gruppe)
-      //    und Biere, die sie angelegt haben
-      const [ratingRows, wishRows, createdRows] = await Promise.all([
+      const [memberRows, beerRows, ratingRows, wishRows] = await Promise.all([
         fetchAll((from, to) =>
           supabase
-            .from("ratings")
-            .select("*")
-            .in("user_id", memberIds)
-            .is("deleted_at", null)
-            .order("created_at")
+            .from("group_members")
+            .select("user_id, role, joined_at, profiles(*)")
+            .eq("group_id", groupId)
             .range(from, to),
         ),
-        fetchAll((from, to) => supabase.from("wishlist").select("*").in("user_id", memberIds).range(from, to)),
         fetchAll((from, to) =>
           supabase
             .from("beers")
             .select("*")
-            .in("created_by", memberIds)
+            .eq("group_id", groupId)
             .is("deleted_at", null)
+            .order("created_at")
+            .range(from, to),
+        ),
+        fetchAll((from, to) =>
+          supabase
+            .from("ratings")
+            .select("*, beers!inner(group_id)")
+            .eq("beers.group_id", groupId)
+            .is("deleted_at", null)
+            .order("created_at")
+            .range(from, to),
+        ),
+        fetchAll((from, to) =>
+          supabase
+            .from("wishlist")
+            .select("*, beers!inner(group_id)")
+            .eq("beers.group_id", groupId)
             .range(from, to),
         ),
       ]);
-
-      // 3) Alle Biere, die in dieser Gruppe vorkommen (in Häppchen, damit die URL kurz bleibt)
-      const known = new Map(createdRows.map((b) => [b.id, b]));
-      const missing = [...new Set([...ratingRows.map((r) => r.beer_id), ...wishRows.map((w) => w.beer_id)])].filter(
-        (id) => !known.has(id),
-      );
-      for (let i = 0; i < missing.length; i += 150) {
-        const { data, error } = await supabase
-          .from("beers")
-          .select("*")
-          .in("id", missing.slice(i, i + 150))
-          .is("deleted_at", null);
-        if (error) throw new Error(error.message);
-        for (const b of data ?? []) known.set(b.id, b);
-      }
-      const beerRows = [...known.values()].sort((a, b) => a.created_at.localeCompare(b.created_at));
-      const beerIds = new Set(beerRows.map((b) => b.id));
-
       if (seq !== loadSeq.current) return;
       setMembers(
         memberRows.map((m) => ({
@@ -172,12 +156,14 @@ export function GroupProvider({ group: groupProp, children }: { group: MyGroup |
       );
       setBeers(beerRows);
       setRatings(
-        ratingRows.filter((r) => beerIds.has(r.beer_id)).map((r) => ({ ...r, grade: Number(r.grade) }) as Rating),
+        ratingRows.map((r) => {
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          const { beers: _join, ...rest } = r as typeof r & { beers: unknown };
+          return { ...rest, grade: Number(rest.grade) } as Rating;
+        }),
       );
       setWishlist(
-        wishRows
-          .filter((w) => beerIds.has(w.beer_id))
-          .map((w) => ({ beer_id: w.beer_id, user_id: w.user_id, created_at: w.created_at })),
+        wishRows.map((w) => ({ beer_id: w.beer_id, user_id: w.user_id, created_at: w.created_at })),
       );
       // Etikett-Fotos: signierte URLs (1 Std. gültig) für alle Biere mit Foto
       const withPhoto = beerRows.filter((b) => b.photo_path);
@@ -235,8 +221,7 @@ export function GroupProvider({ group: groupProp, children }: { group: MyGroup |
     };
     const channel = supabase
       .channel(`group-${groupId}`)
-      // Biere sind ein gemeinsamer Katalog → ohne Filter (selten, harmlos)
-      .on("postgres_changes", { event: "*", schema: "public", table: "beers" }, schedule)
+      .on("postgres_changes", { event: "*", schema: "public", table: "beers", filter: `group_id=eq.${groupId}` }, schedule)
       .on("postgres_changes", { event: "*", schema: "public", table: "group_members", filter: `group_id=eq.${groupId}` }, schedule)
       .on("postgres_changes", { event: "*", schema: "public", table: "wishlist" }, schedule)
       .on("postgres_changes", { event: "*", schema: "public", table: "ratings" }, (payload) => {

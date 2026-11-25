@@ -4,8 +4,6 @@ const MESSAGES: Record<string, string> = {
   invalid_invite_code: "Dieser Einladungslink ist ungültig oder abgelaufen.",
   last_admin: "Du bist der letzte Admin. Mach vorher jemand anderen zum Admin.",
   forbidden: "Dafür fehlen dir die Rechte.",
-  beer_in_use: "Andere haben dieses Bier schon bewertet oder auf der Wunschliste – löschen kannst du nur deine eigene Bewertung.",
-  not_creator: "Löschen kann nur, wer das Bier angelegt hat.",
   "not authenticated": "Bitte melde dich zuerst an.",
 };
 

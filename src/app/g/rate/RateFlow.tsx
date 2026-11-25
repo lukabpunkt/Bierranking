@@ -65,29 +65,7 @@ export function RateFlow() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Gewähltes Bier: aus der Gruppe oder aus dem gemeinsamen Katalog (noch von niemandem hier bewertet)
-  const [picked, setPicked] = useState<Beer | null>(null);
-  const beer = beerId ? (beerById.get(beerId) ?? (picked?.id === beerId ? picked : null)) : null;
-
-  // Katalog-Suche: Biere, die es schon gibt (z. B. aus anderen Gruppen), aber hier noch fehlen
-  const [catalogHits, setCatalogHits] = useState<Beer[]>([]);
-  useEffect(() => {
-    // Sonderzeichen für den PostgREST-Filter entschärfen, Wert wird zusätzlich gequotet
-    const q = query.trim().replace(/[%_,()*"\\]/g, " ").trim();
-    if (q.length < 2) return; // Anzeige wird unten ausgeblendet
-    const t = setTimeout(async () => {
-      const { data } = await createClient()
-        .from("beers")
-        .select("*")
-        .is("deleted_at", null)
-        .or(`name.ilike."%${q}%",brewery.ilike."%${q}%"`)
-        .order("name")
-        .limit(8);
-      setCatalogHits((data ?? []).filter((b) => !beerById.has(b.id)).slice(0, 5));
-    }, 250);
-    return () => clearTimeout(t);
-  }, [query, beerById]);
-  const shownCatalog = query.trim().length >= 2 ? catalogHits : [];
+  const beer = beerId ? beerById.get(beerId) ?? null : null;
 
   const existing: Rating | undefined = useMemo(
     () => ratings.find((r) => r.beer_id === beerId && r.user_id === me.id && r.serving === serving),
@@ -118,8 +96,7 @@ export function RateFlow() {
     return rankByRelevance(beers, query).slice(0, 6);
   }, [beers, query]);
 
-  const exactExists =
-    query.trim() && [...beers, ...shownCatalog].some((b) => duplicateKey(b.name, b.brewery) === duplicateKey(query, ""));
+  const exactExists = query.trim() && beers.some((b) => duplicateKey(b.name, b.brewery) === duplicateKey(query, ""));
 
   const canSave = !!serving && base !== null && (beer !== null || (draft !== null && draftValid(draft))) && !saving;
 
@@ -129,8 +106,7 @@ export function RateFlow() {
     setDupBeer(null);
   }
 
-  function chooseBeer(id: string, fromCatalog?: Beer) {
-    if (fromCatalog) setPicked(fromCatalog);
+  function chooseBeer(id: string) {
     setBeerId(id);
     setDraft(null);
     setDupBeer(null);
@@ -149,7 +125,7 @@ export function RateFlow() {
     }
     const { data, error } = await supabase
       .from("beers")
-      .insert({ ...row, created_by: me.id })
+      .insert({ ...row, group_id: groupId!, created_by: me.id })
       .select()
       .single();
     if (error || !data) {
@@ -159,6 +135,7 @@ export function RateFlow() {
         const { data: found } = await supabase
           .from("beers")
           .select("*")
+          .eq("group_id", groupId!)
           .is("deleted_at", null)
           .ilike("name", row.name.replace(/[%_]/g, "\\$&"));
         const match = (found ?? []).find((b) => duplicateKey(b.name, b.brewery) === duplicateKey(row.name, row.brewery));
@@ -192,19 +169,6 @@ export function RateFlow() {
       if (known) {
         chooseBeer(known.id);
         toast({ message: `Gefunden: ${known.name}` });
-        return;
-      }
-      // Schon im gemeinsamen Katalog (z. B. aus einer anderen Gruppe)?
-      const { data: inCatalog } = await createClient()
-        .from("beers")
-        .select("*")
-        .eq("barcode", code)
-        .is("deleted_at", null)
-        .limit(1)
-        .maybeSingle();
-      if (inCatalog) {
-        chooseBeer(inCatalog.id, inCatalog);
-        toast({ message: `Gefunden: ${inCatalog.name}` });
         return;
       }
       setLookingUp(true);
@@ -359,17 +323,15 @@ export function RateFlow() {
               <div className="rounded-2xl bg-card-2 p-3 text-sm" role="alert">
                 <p className="font-bold">Das Bier gibt es schon.</p>
                 <div className="mt-2 flex flex-wrap gap-2">
-                  <Button className="min-h-11" onClick={() => chooseBeer(dupBeer.id, dupBeer)}>
+                  <Button className="min-h-11" onClick={() => chooseBeer(dupBeer.id)}>
                     „{dupBeer.name}“ bewerten
                   </Button>
-                  {beerById.has(dupBeer.id) && (
-                    <Link
-                      href={groupHref(groupId!, "beer", { beer: dupBeer.id })}
-                      className="inline-flex min-h-11 items-center px-2 font-semibold underline"
-                    >
-                      Ansehen
-                    </Link>
-                  )}
+                  <Link
+                    href={groupHref(groupId!, "beer", { beer: dupBeer.id })}
+                    className="inline-flex min-h-11 items-center px-2 font-semibold underline"
+                  >
+                    Ansehen
+                  </Link>
                 </div>
               </div>
             )}
@@ -410,27 +372,6 @@ export function RateFlow() {
                     type="button"
                     onClick={() => chooseBeer(b.id)}
                     className="flex min-h-14 w-full items-center gap-3 rounded-2xl bg-card px-4 text-left shadow-sm hover:bg-card-2"
-                  >
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate font-semibold">{b.name}</span>
-                      {(b.brewery || b.style) && (
-                        <span className="block truncate text-sm text-muted">
-                          {[b.brewery, b.style].filter(Boolean).join(" · ")}
-                        </span>
-                      )}
-                    </span>
-                  </button>
-                </li>
-              ))}
-              {shownCatalog.length > 0 && (
-                <li className="px-1 pt-2 text-xs text-muted">Schon bekannt (aus anderen Gruppen)</li>
-              )}
-              {shownCatalog.map((b) => (
-                <li key={b.id}>
-                  <button
-                    type="button"
-                    onClick={() => chooseBeer(b.id, b)}
-                    className="flex min-h-14 w-full items-center gap-3 rounded-2xl border border-line bg-card px-4 text-left hover:bg-card-2"
                   >
                     <span className="min-w-0 flex-1">
                       <span className="block truncate font-semibold">{b.name}</span>

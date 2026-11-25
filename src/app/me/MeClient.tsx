@@ -2,16 +2,14 @@
 
 import { groupHref } from "@/lib/paths";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { Download, LogOut, RotateCcw, Search } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Download, LogOut, Search } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { average, formatAvg, gradeLabel } from "@/lib/grades";
 import { servingInfo, SERVINGS } from "@/lib/servings";
 import { downloadFile, slug, toCsv } from "@/lib/export";
 import { matchesQuery } from "@/lib/search";
 import { forgetGroup } from "@/lib/lastGroup";
-import { friendlyError, isUniqueViolation } from "@/lib/errors";
-import { useToast } from "@/components/Toast";
 import { absoluteUrl } from "@/lib/paths";
 import type { Beer, Rating, Serving } from "@/lib/types";
 import { useGroup } from "@/components/GroupProvider";
@@ -23,7 +21,7 @@ import { GradeBadge } from "@/components/GradeBadge";
 import { Button, Card, Chip, Switch, inputClass } from "@/components/ui";
 import { SkeletonBlock } from "@/components/Skeleton";
 
-type MyRating = Rating & { beer: Pick<Beer, "id" | "name" | "brewery" | "style" | "abv" | "country"> };
+type MyRating = Rating & { beer: Pick<Beer, "id" | "name" | "brewery" | "style" | "group_id" | "abv" | "country"> };
 type MySort = "date" | "best" | "worst" | "name";
 
 function formatDate(d: string) {
@@ -31,18 +29,17 @@ function formatDate(d: string) {
 }
 
 export function MeClient({ email }: { email: string }) {
-  const { me, setMe, group, groupId, members, beers, ratings, loading, hideGrades, setHideGrades, refresh } = useGroup();
-  const toast = useToast();
+  const { me, setMe, group, groups, groupId, members, beers, ratings, loading, hideGrades, setHideGrades } = useGroup();
+  const [scope, setScope] = useState<"group" | "all">(groupId ? "group" : "all");
   const [allMine, setAllMine] = useState<MyRating[] | null>(null);
-  const [trash, setTrash] = useState<Beer[] | null>(null);
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<MySort>("date");
 
-  // Meine Bewertungen – sie gehören mir und gelten in allen Gruppen gleich
+  // Alle eigenen Bewertungen über alle Gruppen (für „alle Gruppen“ + Export)
   useEffect(() => {
     createClient()
       .from("ratings")
-      .select("*, beer:beers!inner(id, name, brewery, style, abv, country, deleted_at)")
+      .select("*, beer:beers!inner(id, name, brewery, style, group_id, abv, country, deleted_at)")
       .eq("user_id", me.id)
       .is("deleted_at", null)
       .is("beer.deleted_at", null)
@@ -50,37 +47,17 @@ export function MeClient({ email }: { email: string }) {
       .then(({ data }) =>
         setAllMine(((data ?? []) as unknown as MyRating[]).map((r) => ({ ...r, grade: Number(r.grade) }))),
       );
-  }, [me.id, ratings]);
-
-  // Papierkorb: von mir angelegte, gelöschte Biere
-  const loadTrash = useCallback(async () => {
-    const { data } = await createClient()
-      .from("beers")
-      .select("*")
-      .eq("created_by", me.id)
-      .not("deleted_at", "is", null)
-      .order("deleted_at", { ascending: false });
-    setTrash(data ?? []);
   }, [me.id]);
 
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- Datenabruf
-    void loadTrash();
-  }, [loadTrash]);
+  const groupName = (id: string) => groups.find((g) => g.id === id)?.name ?? "?";
 
-  async function restore(beer: Beer) {
-    const { error } = await createClient().from("beers").update({ deleted_at: null }).eq("id", beer.id);
-    if (error) {
-      return toast({
-        message: isUniqueViolation(error) ? "Es gibt inzwischen ein Bier mit gleichem Namen." : friendlyError(error),
-        tone: "error",
-      });
-    }
-    await Promise.all([loadTrash(), refresh()]);
-    toast({ message: `„${beer.name}“ wiederhergestellt` });
-  }
-
-  const mine: MyRating[] = useMemo(() => allMine ?? [], [allMine]);
+  const mine: MyRating[] = useMemo(() => {
+    if (scope === "all") return allMine ?? [];
+    const byId = new Map(beers.map((b) => [b.id, b]));
+    return ratings
+      .filter((r) => r.user_id === me.id && byId.has(r.beer_id))
+      .map((r) => ({ ...r, beer: byId.get(r.beer_id)! }));
+  }, [scope, allMine, ratings, beers, me.id]);
 
   const stats = useMemo(() => {
     if (mine.length === 0) return null;
@@ -95,7 +72,7 @@ export function MeClient({ email }: { email: string }) {
     })).sort((a, b) => b.n - a.n || a.avg - b.avg);
 
     let stricter: number | null = null;
-    if (groupId) {
+    if (scope === "group") {
       const others = members
         .filter((m) => m.user_id !== me.id)
         .map((m) => average(ratings.filter((r) => r.user_id === m.user_id).map((r) => r.grade)))
@@ -103,7 +80,7 @@ export function MeClient({ email }: { email: string }) {
       if (others.length > 0) stricter = Math.round((others.filter((o) => o < avg).length / others.length) * 100);
     }
     return { avg, count: mine.length, beerCount, favorite, hated, favServing: counts[0].s as Serving, stricter };
-  }, [mine, members, ratings, me.id, groupId]);
+  }, [mine, members, ratings, me.id, scope]);
 
   const myBadges = useMemo(() => computeBadges(me.id, ratings, beers), [me.id, ratings, beers]);
 
@@ -121,6 +98,7 @@ export function MeClient({ email }: { email: string }) {
 
   function exportMine() {
     const rows = (allMine ?? []).map((r) => [
+      groupName(r.beer.group_id),
       r.beer.name,
       r.beer.brewery,
       r.beer.style,
@@ -133,7 +111,7 @@ export function MeClient({ email }: { email: string }) {
     ]);
     downloadFile(
       `prost-zeugnis-${slug(me.display_name)}-${new Date().toISOString().slice(0, 10)}.csv`,
-      toCsv(["Bier", "Brauerei", "Sorte", "Note", "Notenwert", "Gebinde", "Datum", "Ort", "Kommentar"], rows),
+      toCsv(["Gruppe", "Bier", "Brauerei", "Sorte", "Note", "Notenwert", "Gebinde", "Datum", "Ort", "Kommentar"], rows),
       "text/csv;charset=utf-8",
     );
   }
@@ -182,7 +160,7 @@ export function MeClient({ email }: { email: string }) {
     window.location.replace(absoluteUrl("/login/"));
   }
 
-  const loadingStats = allMine === null;
+  const loadingStats = scope === "all" ? allMine === null : loading;
 
   return (
     <div className="space-y-5">
@@ -202,9 +180,30 @@ export function MeClient({ email }: { email: string }) {
       </Card>
 
       <Card className="space-y-4">
-        <div>
+        <div className="flex items-center justify-between gap-2">
           <h2 className="text-lg font-bold">Statistik</h2>
-          <p className="text-sm text-muted">Deine Bewertungen gelten in allen deinen Gruppen.</p>
+          <div className="flex gap-1 rounded-xl bg-card-2 p-1 text-sm" role="radiogroup" aria-label="Bereich">
+            {groupId && (
+              <button
+                type="button"
+                role="radio"
+                aria-checked={scope === "group"}
+                onClick={() => setScope("group")}
+                className={`min-h-10 max-w-28 truncate rounded-lg px-3 font-semibold ${scope === "group" ? "bg-card shadow-sm" : "text-muted"}`}
+              >
+                {group?.name}
+              </button>
+            )}
+            <button
+              type="button"
+              role="radio"
+              aria-checked={scope === "all"}
+              onClick={() => setScope("all")}
+              className={`min-h-10 rounded-lg px-3 font-semibold whitespace-nowrap ${scope === "all" ? "bg-card shadow-sm" : "text-muted"}`}
+            >
+              Alle Gruppen
+            </button>
+          </div>
         </div>
 
         {loadingStats ? (
@@ -230,8 +229,8 @@ export function MeClient({ email }: { email: string }) {
             {stats.stricter !== null && (
               <p className="text-center font-semibold">
                 {stats.stricter >= 50
-                  ? `Du bist strenger als ${stats.stricter} % von „${group?.name}“ 🧐`
-                  : `Du bist milder als ${100 - stats.stricter} % von „${group?.name}“ 😇`}
+                  ? `Du bist strenger als ${stats.stricter} % der Gruppe 🧐`
+                  : `Du bist milder als ${100 - stats.stricter} % der Gruppe 😇`}
               </p>
             )}
             <ul className="space-y-2">
@@ -310,7 +309,7 @@ export function MeClient({ email }: { email: string }) {
             {list.map((r) => (
               <li key={r.id}>
                 <Link
-                  href={groupId ? groupHref(groupId, "beer", { beer: r.beer_id }) : "/groups/"}
+                  href={groupHref(r.beer.group_id, "beer", { beer: r.beer_id })}
                   className="flex min-h-14 items-center gap-3 py-2 hover:opacity-80"
                 >
                   <GradeBadge value={r.grade} size="sm" />
@@ -318,6 +317,7 @@ export function MeClient({ email }: { email: string }) {
                     <span className="block truncate font-semibold">{r.beer.name}</span>
                     <span className="block truncate text-sm text-muted">
                       {servingInfo(r.serving).icon} {formatDate(r.rated_on)}
+                      {scope === "all" && ` · ${groupName(r.beer.group_id)}`}
                     </span>
                   </span>
                 </Link>
@@ -326,30 +326,6 @@ export function MeClient({ email }: { email: string }) {
           </ul>
         )}
       </Card>
-
-      {trash && trash.length > 0 && (
-        <Card>
-          <h2 className="mb-1 text-lg font-bold">Papierkorb</h2>
-          <p className="mb-3 text-sm text-muted">Von dir angelegte, gelöschte Biere – samt Bewertungen wiederherstellbar.</p>
-          <ul className="divide-y divide-line">
-            {trash.map((b) => (
-              <li key={b.id} className="flex min-h-14 items-center gap-3 py-2">
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-semibold">{b.name}</p>
-                  <p className="truncate text-sm text-muted">
-                    {[b.brewery, b.deleted_at && `gelöscht am ${new Date(b.deleted_at).toLocaleDateString("de-DE")}`]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  </p>
-                </div>
-                <Button variant="secondary" className="min-h-11 px-3" onClick={() => restore(b)}>
-                  <RotateCcw size={18} aria-hidden /> Zurück
-                </Button>
-              </li>
-            ))}
-          </ul>
-        </Card>
-      )}
 
       <Card>
         <PasswordForm />

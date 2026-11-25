@@ -39,22 +39,22 @@ insert into public.group_members (group_id, user_id, role) values
   ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '33333333-3333-3333-3333-333333333333', 'member');
 
 -- ---------- 15 Biere ----------
-insert into public.beers (id, name, brewery, style, abv, country, created_by, created_at) values
-  ('b0000000-0000-0000-0000-000000000001', 'Augustiner Lagerbier Hell', 'Augustiner', 'Helles', 5.2, 'Deutschland', '11111111-1111-1111-1111-111111111111', now() - interval '30 days'),
-  ('b0000000-0000-0000-0000-000000000002', 'Tegernseer Hell', 'Tegernsee', 'Helles', 4.8, 'Deutschland', '22222222-2222-2222-2222-222222222222', now() - interval '29 days'),
-  ('b0000000-0000-0000-0000-000000000003', 'Löwenbräu Original', 'Löwenbräu', 'Helles', 5.2, 'Deutschland', '11111111-1111-1111-1111-111111111111', now() - interval '27 days'),
-  ('b0000000-0000-0000-0000-000000000004', 'Jever Pilsener', 'Jever', 'Pils', 4.9, 'Deutschland', '33333333-3333-3333-3333-333333333333', now() - interval '25 days'),
-  ('b0000000-0000-0000-0000-000000000005', 'Rothaus Tannenzäpfle', 'Rothaus', 'Pils', 5.1, 'Deutschland', '22222222-2222-2222-2222-222222222222', now() - interval '22 days'),
-  ('b0000000-0000-0000-0000-000000000006', 'Weihenstephaner Hefeweissbier', 'Weihenstephan', 'Weizen', 5.4, 'Deutschland', '11111111-1111-1111-1111-111111111111', now() - interval '20 days'),
-  ('b0000000-0000-0000-0000-000000000007', 'Paulaner Hefe-Weißbier', 'Paulaner', 'Weizen', 5.5, 'Deutschland', '33333333-3333-3333-3333-333333333333', now() - interval '18 days'),
-  ('b0000000-0000-0000-0000-000000000008', 'Krombacher Pils', 'Krombacher', 'Pils', 4.8, 'Deutschland', '22222222-2222-2222-2222-222222222222', now() - interval '15 days'),
-  ('b0000000-0000-0000-0000-000000000009', 'Oettinger Pils', 'Oettinger', 'Pils', 4.7, 'Deutschland', '22222222-2222-2222-2222-222222222222', now() - interval '14 days'),
-  ('b0000000-0000-0000-0000-000000000010', 'Ayinger Celebrator', 'Ayinger', 'Bock', 6.7, 'Deutschland', '11111111-1111-1111-1111-111111111111', now() - interval '12 days'),
-  ('b0000000-0000-0000-0000-000000000011', 'Köstritzer Schwarzbier', 'Köstritzer', 'Dunkel', 4.8, 'Deutschland', '33333333-3333-3333-3333-333333333333', now() - interval '10 days'),
-  ('b0000000-0000-0000-0000-000000000012', 'BrewDog Punk IPA', 'BrewDog', 'IPA', 5.4, 'Schottland', '22222222-2222-2222-2222-222222222222', now() - interval '8 days'),
-  ('b0000000-0000-0000-0000-000000000013', 'Pilsner Urquell', 'Plzeňský Prazdroj', 'Pils', 4.4, 'Tschechien', '11111111-1111-1111-1111-111111111111', now() - interval '5 days'),
-  ('b0000000-0000-0000-0000-000000000014', 'Erdinger Alkoholfrei', 'Erdinger', 'Alkoholfrei', 0.4, 'Deutschland', '33333333-3333-3333-3333-333333333333', now() - interval '3 days'),
-  ('b0000000-0000-0000-0000-000000000015', 'Radeberger Radler', 'Radeberger', 'Radler', 2.5, 'Deutschland', '22222222-2222-2222-2222-222222222222', now() - interval '1 day');
+insert into public.beers (id, group_id, name, brewery, style, abv, country, created_by, created_at) values
+  ('b0000000-0000-0000-0000-000000000001', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'Augustiner Lagerbier Hell', 'Augustiner', 'Helles', 5.2, 'Deutschland', '11111111-1111-1111-1111-111111111111', now() - interval '30 days'),
+  ('b0000000-0000-0000-0000-000000000002', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'Tegernseer Hell', 'Tegernsee', 'Helles', 4.8, 'Deutschland', '22222222-2222-2222-2222-222222222222', now() - interval '29 days'),
+  ('b0000000-0000-0000-0000-000000000003', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'Löwenbräu Original', 'Löwenbräu', 'Helles', 5.2, 'Deutschland', '11111111-1111-1111-1111-111111111111', now() - interval '27 days'),
+  ('b0000000-0000-0000-0000-000000000004', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'Jever Pilsener', 'Jever', 'Pils', 4.9, 'Deutschland', '33333333-3333-3333-3333-333333333333', now() - interval '25 days'),
+  ('b0000000-0000-0000-0000-000000000005', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'Rothaus Tannenzäpfle', 'Rothaus', 'Pils', 5.1, 'Deutschland', '22222222-2222-2222-2222-222222222222', now() - interval '22 days'),
+  ('b0000000-0000-0000-0000-000000000006', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'Weihenstephaner Hefeweissbier', 'Weihenstephan', 'Weizen', 5.4, 'Deutschland', '11111111-1111-1111-1111-111111111111', now() - interval '20 days'),
+  ('b0000000-0000-0000-0000-000000000007', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'Paulaner Hefe-Weißbier', 'Paulaner', 'Weizen', 5.5, 'Deutschland', '33333333-3333-3333-3333-333333333333', now() - interval '18 days'),
+  ('b0000000-0000-0000-0000-000000000008', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'Krombacher Pils', 'Krombacher', 'Pils', 4.8, 'Deutschland', '22222222-2222-2222-2222-222222222222', now() - interval '15 days'),
+  ('b0000000-0000-0000-0000-000000000009', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'Oettinger Pils', 'Oettinger', 'Pils', 4.7, 'Deutschland', '22222222-2222-2222-2222-222222222222', now() - interval '14 days'),
+  ('b0000000-0000-0000-0000-000000000010', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'Ayinger Celebrator', 'Ayinger', 'Bock', 6.7, 'Deutschland', '11111111-1111-1111-1111-111111111111', now() - interval '12 days'),
+  ('b0000000-0000-0000-0000-000000000011', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'Köstritzer Schwarzbier', 'Köstritzer', 'Dunkel', 4.8, 'Deutschland', '33333333-3333-3333-3333-333333333333', now() - interval '10 days'),
+  ('b0000000-0000-0000-0000-000000000012', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'BrewDog Punk IPA', 'BrewDog', 'IPA', 5.4, 'Schottland', '22222222-2222-2222-2222-222222222222', now() - interval '8 days'),
+  ('b0000000-0000-0000-0000-000000000013', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'Pilsner Urquell', 'Plzeňský Prazdroj', 'Pils', 4.4, 'Tschechien', '11111111-1111-1111-1111-111111111111', now() - interval '5 days'),
+  ('b0000000-0000-0000-0000-000000000014', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'Erdinger Alkoholfrei', 'Erdinger', 'Alkoholfrei', 0.4, 'Deutschland', '33333333-3333-3333-3333-333333333333', now() - interval '3 days'),
+  ('b0000000-0000-0000-0000-000000000015', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'Radeberger Radler', 'Radeberger', 'Radler', 2.5, 'Deutschland', '22222222-2222-2222-2222-222222222222', now() - interval '1 day');
 
 -- ---------- Bewertungen ----------
 insert into public.ratings (beer_id, user_id, grade, serving, comment, location, rated_on) values
