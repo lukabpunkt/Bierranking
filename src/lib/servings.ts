@@ -1,3 +1,4 @@
+import { CATALOG_STYLES } from "./catalogStyles";
 import type { Serving } from "./types";
 
 export const SERVINGS: { value: Serving; label: string; icon: string }[] = [
@@ -14,19 +15,11 @@ export function isServing(s: string | null | undefined): s is Serving {
   return s === "can" || s === "bottle" || s === "tap";
 }
 
-export const STYLES = [
-  "Pils",
-  "Helles",
-  "Export",
-  "Weizen",
-  "Dunkel",
-  "Bock",
-  "IPA",
-  "Lager",
-  "Radler",
-  "Alkoholfrei",
-  "Sonstiges",
-];
+/** Sorten-Chips: die häufigsten Sorten aus dem Bierkatalog (bierkatalog.md). */
+export const STYLES: string[] = CATALOG_STYLES.slice(0, 16);
+
+/** Alle Sorten aus dem Katalog (für die Eingabehilfe „Andere Sorte“). */
+export const ALL_STYLES: string[] = CATALOG_STYLES;
 
 export const EMOJIS = [
   "🍺", "🍻", "🥨", "🌭", "🍕", "🍔", "🦊", "🐻",

@@ -10,7 +10,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "types": "supabase gen types typescript --project-id iczhiknsnmlrsvimperc > src/lib/database.types.ts"
+    "types": "supabase gen types typescript --project-id iczhiknsnmlrsvimperc > src/lib/database.types.ts",
+    "catalog": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/import-catalog.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.119.2",

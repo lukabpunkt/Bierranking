@@ -15,6 +15,40 @@ export type Database = {
   }
   public: {
     Tables: {
+      beer_catalog: {
+        Row: {
+          alcohol_free: boolean
+          brewery: string | null
+          country: string | null
+          created_at: string
+          id: string
+          name: string
+          search_text: string | null
+          style: string | null
+          updated_at: string
+        }
+        Insert: {
+          alcohol_free?: boolean
+          brewery?: string | null
+          country?: string | null
+          created_at?: string
+          id?: string
+          name: string
+          style?: string | null
+          updated_at?: string
+        }
+        Update: {
+          alcohol_free?: boolean
+          brewery?: string | null
+          country?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+          style?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       beer_history: {
         Row: {
           beer_id: string
@@ -62,6 +96,7 @@ export type Database = {
           abv: number | null
           barcode: string | null
           brewery: string | null
+          catalog_id: string | null
           country: string | null
           created_at: string
           created_by: string
@@ -76,6 +111,7 @@ export type Database = {
           abv?: number | null
           barcode?: string | null
           brewery?: string | null
+          catalog_id?: string | null
           country?: string | null
           created_at?: string
           created_by?: string
@@ -90,6 +126,7 @@ export type Database = {
           abv?: number | null
           barcode?: string | null
           brewery?: string | null
+          catalog_id?: string | null
           country?: string | null
           created_at?: string
           created_by?: string
@@ -101,6 +138,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "beers_catalog_id_fkey"
+            columns: ["catalog_id"]
+            isOneToOne: false
+            referencedRelation: "beer_catalog"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "beers_created_by_fkey"
             columns: ["created_by"]
@@ -334,6 +378,11 @@ export type Database = {
       join_group: { Args: { p_code: string }; Returns: string }
       leave_group: { Args: { p_group: string }; Returns: undefined }
       regenerate_invite_code: { Args: { p_group: string }; Returns: string }
+      search_catalog: {
+        Args: { q: string }
+        Returns: Database["public"]["Tables"]["beer_catalog"]["Row"][]
+      }
+      search_normalize: { Args: { t: string }; Returns: string }
       shares_group: { Args: { other: string }; Returns: boolean }
     }
     Enums: {

@@ -14,6 +14,7 @@ const beer = (id: string, extra: Partial<Beer> = {}): Beer => ({
   country: null,
   photo_path: null,
   barcode: null,
+  catalog_id: null,
   created_by: "anna",
   created_at: `2026-01-0${(n++ % 9) + 1}T10:00:00Z`,
   updated_at: "2026-01-01T10:00:00Z",
@@ -119,7 +120,8 @@ describe("Aktivitäts-Feed", () => {
 describe("Open Food Facts", () => {
   it("rät die Sorte", () => {
     expect(guessStyle(["en:beers", "en:pilsner-beers"])).toBe("Pils");
-    expect(guessStyle(["en:wheat-beers"])).toBe("Weizen");
+    expect(guessStyle(["en:wheat-beers"])).toBe("Hefeweizen");
+    expect(guessStyle(["en:stouts"])).toBe("Stout");
     expect(guessStyle([], "Erdinger Alkoholfrei")).toBe("Alkoholfrei");
     expect(guessStyle(["en:india-pale-ale"])).toBe("IPA");
     expect(guessStyle(["en:beers"])).toBe("");

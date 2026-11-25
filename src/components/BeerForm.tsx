@@ -1,6 +1,6 @@
 "use client";
 
-import { STYLES } from "@/lib/servings";
+import { ALL_STYLES, STYLES } from "@/lib/servings";
 import { Chip, Field, inputClass } from "./ui";
 
 export type BeerDraft = { name: string; brewery: string; style: string; abv: string; country: string; barcode?: string };
@@ -30,7 +30,8 @@ export function draftValid(d: BeerDraft) {
 
 export function BeerForm({ draft, onChange }: { draft: BeerDraft; onChange: (d: BeerDraft) => void }) {
   const set = (patch: Partial<BeerDraft>) => onChange({ ...draft, ...patch });
-  const styleOptions = draft.style && !STYLES.includes(draft.style) ? [...STYLES, draft.style] : STYLES;
+  // Chips: häufigste Katalog-Sorten; eine andere gewählte Sorte steht im Feld darunter
+  const styleOptions = STYLES;
 
   return (
     <div className="space-y-4">
@@ -55,6 +56,20 @@ export function BeerForm({ draft, onChange }: { draft: BeerDraft; onChange: (d: 
             </Chip>
           ))}
         </div>
+        <input
+          className={`${inputClass} mt-2`}
+          list="beer-styles"
+          value={STYLES.includes(draft.style) ? "" : draft.style}
+          maxLength={40}
+          placeholder="Andere Sorte, z. B. Kölsch, Stout, Tripel …"
+          aria-label="Andere Sorte"
+          onChange={(e) => set({ style: e.target.value })}
+        />
+        <datalist id="beer-styles">
+          {ALL_STYLES.filter((s) => !STYLES.includes(s)).map((s) => (
+            <option key={s} value={s} />
+          ))}
+        </datalist>
       </div>
       {draft.barcode && (
         <p className="flex items-center justify-between gap-2 rounded-2xl bg-card-2 px-4 py-2 text-sm">

@@ -7,10 +7,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Bookmark, ChevronDown, Plus, ScanBarcode, Search, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { gradeFromParts, gradeLabel, partsFromGrade, type Modifier } from "@/lib/grades";
-import { duplicateKey, rankByRelevance } from "@/lib/search";
+import { duplicateKey, normalize, rankByRelevance } from "@/lib/search";
 import { friendlyError, isUniqueViolation } from "@/lib/errors";
 import { isServing } from "@/lib/servings";
-import type { Beer, Rating, Serving } from "@/lib/types";
+import type { Beer, CatalogBeer, Rating, Serving } from "@/lib/types";
 import { useGroup } from "@/components/GroupProvider";
 import { GradePicker } from "@/components/GradePicker";
 import { ServingPicker } from "@/components/ServingPicker";
@@ -69,25 +69,43 @@ export function RateFlow() {
   const [picked, setPicked] = useState<Beer | null>(null);
   const beer = beerId ? (beerById.get(beerId) ?? (picked?.id === beerId ? picked : null)) : null;
 
-  // Katalog-Suche: Biere, die es schon gibt (z. B. aus anderen Gruppen), aber hier noch fehlen
+  // Vorschläge (ab 2 Zeichen):
+  //  a) Biere, die es schon gibt (z. B. aus anderen Gruppen), aber hier noch fehlen
+  //  b) Einträge aus dem Bierkatalog (search_catalog: Trigram-Ähnlichkeit, Umlaute egal)
   const [catalogHits, setCatalogHits] = useState<Beer[]>([]);
+  const [proposals, setProposals] = useState<CatalogBeer[]>([]);
+  const [catalogPick, setCatalogPick] = useState<CatalogBeer | null>(null);
   useEffect(() => {
     // Sonderzeichen für den PostgREST-Filter entschärfen, Wert wird zusätzlich gequotet
     const q = query.trim().replace(/[%_,()*"\\]/g, " ").trim();
     if (q.length < 2) return; // Anzeige wird unten ausgeblendet
     const t = setTimeout(async () => {
-      const { data } = await createClient()
-        .from("beers")
-        .select("*")
-        .is("deleted_at", null)
-        .or(`name.ilike."%${q}%",brewery.ilike."%${q}%"`)
-        .order("name")
-        .limit(8);
-      setCatalogHits((data ?? []).filter((b) => !beerById.has(b.id)).slice(0, 5));
-    }, 250);
+      const supabase = createClient();
+      const [{ data: beersFound }, { data: catalogFound }] = await Promise.all([
+        supabase
+          .from("beers")
+          .select("*")
+          .is("deleted_at", null)
+          .or(`name.ilike."%${q}%",brewery.ilike."%${q}%"`)
+          .order("name")
+          .limit(8),
+        supabase.rpc("search_catalog", { q: query.trim() }),
+      ]);
+      setCatalogHits((beersFound ?? []).filter((b) => !beerById.has(b.id)).slice(0, 4));
+      setProposals(catalogFound ?? []);
+    }, 200);
     return () => clearTimeout(t);
   }, [query, beerById]);
-  const shownCatalog = query.trim().length >= 2 ? catalogHits : [];
+  const shownCatalog = useMemo(() => (query.trim().length >= 2 ? catalogHits : []), [query, catalogHits]);
+
+  // Katalogeinträge ausblenden, die es als Bier schon gibt (gleiche catalog_id oder gleicher Name)
+  const shownProposals = useMemo(() => {
+    if (query.trim().length < 2) return [];
+    const known = [...beers, ...shownCatalog];
+    const ids = new Set(known.map((b) => b.catalog_id).filter(Boolean));
+    const names = new Set(known.map((b) => normalize(b.name)));
+    return proposals.filter((c) => !ids.has(c.id) && !names.has(normalize(c.name))).slice(0, 8);
+  }, [proposals, beers, shownCatalog, query]);
 
   const existing: Rating | undefined = useMemo(
     () => ratings.find((r) => r.beer_id === beerId && r.user_id === me.id && r.serving === serving),
@@ -119,13 +137,20 @@ export function RateFlow() {
   }, [beers, query]);
 
   const exactExists =
-    query.trim() && [...beers, ...shownCatalog].some((b) => duplicateKey(b.name, b.brewery) === duplicateKey(query, ""));
+    query.trim() &&
+    ([...beers, ...shownCatalog].some((b) => duplicateKey(b.name, b.brewery) === duplicateKey(query, "")) ||
+      shownProposals.some((c) => normalize(c.name) === normalize(query)));
 
-  const canSave = !!serving && base !== null && (beer !== null || (draft !== null && draftValid(draft))) && !saving;
+  const canSave =
+    !!serving &&
+    base !== null &&
+    (beer !== null || catalogPick !== null || (draft !== null && draftValid(draft))) &&
+    !saving;
 
   function startCreate() {
     setDraft(emptyDraft(query.trim()));
     setBeerId(null);
+    setCatalogPick(null);
     setDupBeer(null);
   }
 
@@ -133,7 +158,55 @@ export function RateFlow() {
     if (fromCatalog) setPicked(fromCatalog);
     setBeerId(id);
     setDraft(null);
+    setCatalogPick(null);
     setDupBeer(null);
+  }
+
+  /** Vorschlag aus dem Katalog wählen – Name, Brauerei, Sorte, Land werden übernommen, weiter zur Note. */
+  function chooseProposal(c: CatalogBeer) {
+    setCatalogPick(c);
+    setBeerId(null);
+    setDraft(null);
+    setDupBeer(null);
+  }
+
+  /** Bier zum Katalogeintrag finden oder anlegen (mit catalog_id). */
+  async function ensureCatalogBeer(c: CatalogBeer): Promise<string | null> {
+    const supabase = createClient();
+    const { data: linked } = await supabase
+      .from("beers")
+      .select("id")
+      .eq("catalog_id", c.id)
+      .is("deleted_at", null)
+      .limit(1)
+      .maybeSingle();
+    if (linked) return linked.id;
+    const { data, error } = await supabase
+      .from("beers")
+      .insert({
+        name: c.name,
+        brewery: c.brewery,
+        style: c.style,
+        country: c.country,
+        catalog_id: c.id,
+        created_by: me.id,
+      })
+      .select("id")
+      .single();
+    if (data) return data.id;
+    if (isUniqueViolation(error)) {
+      // Gleiches Bier wurde schon von Hand angelegt → das verwenden
+      const { data: found } = await supabase
+        .from("beers")
+        .select("*")
+        .is("deleted_at", null)
+        .ilike("name", c.name.replace(/[%_]/g, "\\$&"));
+      const match = (found ?? []).find((b) => duplicateKey(b.name, b.brewery) === duplicateKey(c.name, c.brewery));
+      if (match) return match.id;
+    }
+    setSaving(false);
+    toast({ message: friendlyError(error, "Das Bier konnte nicht angelegt werden."), tone: "error" });
+    return null;
   }
 
   /** Legt das Bier aus dem Formular an. Bei Duplikat: Hinweis + null. */
@@ -174,9 +247,9 @@ export function RateFlow() {
 
   /** Neues Bier nur merken („Will ich probieren“), ohne Note. */
   async function saveToWishlist() {
-    if (!draft || !draftValid(draft) || saving) return;
+    if (saving || !(catalogPick || (draft && draftValid(draft)))) return;
     setSaving(true);
-    const id = await createBeerFromDraft();
+    const id = catalogPick ? await ensureCatalogBeer(catalogPick) : await createBeerFromDraft();
     if (!id) return;
     await createClient().from("wishlist").insert({ beer_id: id, user_id: me.id });
     await refresh();
@@ -234,7 +307,11 @@ export function RateFlow() {
     const supabase = createClient();
     let targetId = beer?.id ?? null;
 
-    if (!targetId && draft) {
+    if (!targetId && catalogPick) {
+      const id = await ensureCatalogBeer(catalogPick);
+      if (!id) return;
+      targetId = id;
+    } else if (!targetId && draft) {
       const id = await createBeerFromDraft();
       if (!id) return;
       targetId = id;
@@ -330,6 +407,36 @@ export function RateFlow() {
               <X size={20} />
             </button>
           </div>
+        ) : catalogPick ? (
+          <div className="space-y-3 rounded-2xl border-2 border-accent bg-accent/10 p-3">
+            <div className="flex items-center gap-3">
+              <span className="text-3xl" aria-hidden>
+                🍺
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-lg font-bold">{catalogPick.name}</p>
+                <p className="truncate text-sm text-muted">
+                  {[catalogPick.brewery, catalogPick.style, catalogPick.country, catalogPick.alcohol_free && "alkoholfrei"]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </p>
+                <span className="mt-1 inline-block rounded-full bg-card px-2 py-0.5 text-xs font-semibold text-muted">
+                  Vorschlag aus dem Bierkatalog
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setCatalogPick(null)}
+                aria-label="Anderes Bier wählen"
+                className="flex h-11 w-11 items-center justify-center rounded-full hover:bg-card-2"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <Button variant="secondary" className="w-full" disabled={saving} onClick={saveToWishlist}>
+              <Bookmark size={18} aria-hidden /> Nur auf die Wunschliste (noch nicht probiert)
+            </Button>
+          </div>
         ) : draft ? (
           <div className="space-y-3 rounded-2xl border-2 border-accent bg-card p-4">
             <div className="flex items-center justify-between">
@@ -419,11 +526,16 @@ export function RateFlow() {
                         </span>
                       )}
                     </span>
+                    {query.trim() && (
+                      <span className="shrink-0 rounded-full bg-accent/20 px-2 py-0.5 text-xs font-semibold text-accent-strong">
+                        in eurer Liste
+                      </span>
+                    )}
                   </button>
                 </li>
               ))}
-              {shownCatalog.length > 0 && (
-                <li className="px-1 pt-2 text-xs text-muted">Schon bekannt (aus anderen Gruppen)</li>
+              {(shownCatalog.length > 0 || shownProposals.length > 0) && (
+                <li className="px-1 pt-2 text-xs text-muted">Vorschläge</li>
               )}
               {shownCatalog.map((b) => (
                 <li key={b.id}>
@@ -440,6 +552,24 @@ export function RateFlow() {
                         </span>
                       )}
                     </span>
+                    <ProposalTag />
+                  </button>
+                </li>
+              ))}
+              {shownProposals.map((c) => (
+                <li key={c.id}>
+                  <button
+                    type="button"
+                    onClick={() => chooseProposal(c)}
+                    className="flex min-h-14 w-full items-center gap-3 rounded-2xl border border-line bg-card px-4 text-left hover:bg-card-2"
+                  >
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate font-semibold">{c.name}</span>
+                      <span className="block truncate text-sm text-muted">
+                        {[c.brewery, c.style, c.alcohol_free && "alkoholfrei"].filter(Boolean).join(" · ")}
+                      </span>
+                    </span>
+                    <ProposalTag />
                   </button>
                 </li>
               ))}
@@ -551,5 +681,11 @@ export function RateFlow() {
       {/* Bei jedem Öffnen frisch (Kamera, Eingabefeld) */}
       {scanOpen && <BarcodeScanner open onClose={() => setScanOpen(false)} onDetected={onScanned} />}
     </div>
+  );
+}
+
+function ProposalTag() {
+  return (
+    <span className="shrink-0 rounded-full bg-card-2 px-2 py-0.5 text-xs font-semibold text-muted">Vorschlag</span>
   );
 }

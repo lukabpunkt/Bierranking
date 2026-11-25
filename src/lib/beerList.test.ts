@@ -12,6 +12,7 @@ function beer(id: string, name: string, created: string, extra: Partial<Beer> = 
     country: null,
     photo_path: null,
     barcode: null,
+    catalog_id: null,
     created_by: "u",
     created_at: created,
     updated_at: created,
