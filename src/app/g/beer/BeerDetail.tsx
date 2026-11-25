@@ -33,7 +33,7 @@ function formatDate(d: string) {
 export function BeerDetail({ beerId }: { beerId: string }) {
   const router = useRouter();
   const toast = useToast();
-  const { groupId, beerById, ratings, stats, me, isAdmin, profileOf, isHidden, reveal, wasJustRevealed, loading, refresh } =
+  const { groupId, beerById, ratings, stats, me, wishlist, profileOf, isHidden, reveal, wasJustRevealed, loading, refresh } =
     useGroup();
   const [menu, setMenu] = useState(false);
   const [edit, setEdit] = useState<BeerDraft | null>(null);
@@ -83,7 +83,11 @@ export function BeerDetail({ beerId }: { beerId: string }) {
     );
   }
 
-  const canDelete = beer.created_by === me.id || isAdmin;
+  // Biere sind gruppenübergreifend: löschen nur die anlegende Person, solange niemand anderes es bewertet hat
+  const othersUse =
+    ratings.some((r) => r.beer_id === beerId && r.user_id !== me.id) ||
+    wishlist.some((w) => w.beer_id === beerId && w.user_id !== me.id);
+  const canDelete = beer.created_by === me.id && !othersUse;
   const creator = profileOf(beer.created_by);
 
   async function deleteRating(r: Rating) {

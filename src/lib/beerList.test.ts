@@ -6,7 +6,6 @@ function beer(id: string, name: string, created: string, extra: Partial<Beer> = 
   return {
     id,
     name,
-    group_id: "g",
     brewery: null,
     style: null,
     abv: null,

@@ -147,20 +147,21 @@ test("B: Einladung ohne Login → Login → Onboarding → automatisch Mitglied"
   await expect(page.getByText("Tegernseer Hell")).toBeVisible();
 });
 
-test("RLS: Nicht-Mitglied C sieht per API keine Gruppendaten", async () => {
+test("RLS: Nicht-Mitglied C sieht keine Gruppe, keine Bewertungen, darf nichts ändern", async () => {
   const c = await apiAs(C, PW);
-    const [{ data: beers }, { data: groups }, { data: members }, { data: ratings }] = await Promise.all([
-    c.from("beers").select("*").eq("group_id", groupId),
+  const [{ data: groups }, { data: members }, { data: ratings }, { data: beers }] = await Promise.all([
     c.from("groups").select("*").eq("id", groupId),
     c.from("group_members").select("*").eq("group_id", groupId),
     c.from("ratings").select("*"),
+    c.from("beers").select("id, name").eq("name", "Löwenbräu Original"),
   ]);
-  expect(beers).toEqual([]);
   expect(groups).toEqual([]);
   expect(members).toEqual([]);
-  expect(ratings).toEqual([]);
-  const { error } = await c.from("beers").insert({ group_id: groupId, name: "Eindringling" });
-  expect(error).not.toBeNull();
+  expect(ratings).toEqual([]); // Bewertungen sieht nur, wer eine Gruppe mit der Person teilt
+  // Der Bier-Katalog ist gemeinsam (für Suche/Duplikate) – ändern darf C das Bier aber nicht
+  expect(beers).toHaveLength(1);
+  const { data: changed } = await c.from("beers").update({ name: "Gehackt" }).eq("id", beers![0].id).select();
+  expect(changed).toEqual([]);
   const { error: regen } = await c.rpc("regenerate_invite_code", { p_group: groupId });
   expect(regen?.message).toContain("forbidden");
 });
@@ -248,7 +249,8 @@ test("A: Bewertung löschen + Rückgängig, Bier löschen + Papierkorb", async (
   await expect(page.getByRole("link", { name: /Tegernseer Hell/ })).toHaveCount(0);
   await expect(page.getByText(/„Tegernseer Hell“ gelöscht/)).toBeVisible();
 
-  await page.goto(sub("settings"));
+  // Papierkorb liegt im Profil (Biere sind gruppenübergreifend)
+  await page.goto("/me/");
   await page.getByRole("button", { name: "Zurück" }).click();
   await expect(page.getByText(/wiederhergestellt/)).toBeVisible();
   await page.goto(groupUrl);

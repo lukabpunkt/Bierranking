@@ -23,7 +23,8 @@ export function BeerPhoto({ beer }: { beer: Beer }) {
     setBusy(true);
     try {
       const blob = await resizeImage(file, 1200);
-      const path = `${beer.group_id}/${beer.id}.jpg`;
+      // Biere sind gruppenübergreifend → ein Foto pro Bier
+      const path = `${beer.id}.jpg`;
       const supabase = createClient();
       const { error } = await supabase.storage
         .from("beer-photos")

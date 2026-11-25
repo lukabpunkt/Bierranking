@@ -1,14 +1,14 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
-import { Copy, LogOut, RefreshCw, RotateCcw, Share2, Shield, Trash2, UserMinus } from "lucide-react";
+import { useState } from "react";
+import { Copy, LogOut, RefreshCw, Share2, Shield, Trash2, UserMinus } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { friendlyError, isUniqueViolation } from "@/lib/errors";
+import { friendlyError } from "@/lib/errors";
 import { forgetGroup } from "@/lib/lastGroup";
 import { absoluteUrl } from "@/lib/paths";
 import { useSession } from "@/components/SessionProvider";
-import type { Beer, Member } from "@/lib/types";
+import type { Member } from "@/lib/types";
 import { useGroup } from "@/components/GroupProvider";
 import { Avatar } from "@/components/Avatar";
 import { BottomSheet } from "@/components/BottomSheet";
@@ -20,30 +20,13 @@ export default function SettingsPage() {
   const router = useRouter();
   const toast = useToast();
   const { reloadGroups } = useSession();
-  const { group, setGroup, isAdmin, members, setMembers, me, loading, refresh } = useGroup();
+  const { group, setGroup, isAdmin, members, setMembers, me, loading } = useGroup();
   const [name, setName] = useState(group?.name ?? "");
-  const [trash, setTrash] = useState<Beer[] | null>(null);
   const [confirm, setConfirm] = useState<"leave" | "delete" | null>(null);
   const [confirmText, setConfirmText] = useState("");
   const [busy, setBusy] = useState(false);
   const supabase = createClient();
   const inviteUrl = group && typeof window !== "undefined" ? absoluteUrl(`/join/?code=${group.invite_code}`) : "";
-
-  const loadTrash = useCallback(async () => {
-    if (!group || !isAdmin) return;
-    const { data } = await createClient()
-      .from("beers")
-      .select("*")
-      .eq("group_id", group.id)
-      .not("deleted_at", "is", null)
-      .order("deleted_at", { ascending: false });
-    setTrash(data ?? []);
-  }, [group, isAdmin]);
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- Datenabruf
-    void loadTrash();
-  }, [loadTrash]);
 
   if (!group) return null;
 
@@ -97,19 +80,6 @@ export default function SettingsPage() {
     toast({
       message: `${m.profile.display_name} entfernt`,
     });
-  }
-
-  async function restore(beer: Beer) {
-    const { error } = await supabase.from("beers").update({ deleted_at: null }).eq("id", beer.id);
-    if (error) {
-      return toast({
-        message: isUniqueViolation(error) ? "Es gibt inzwischen ein Bier mit gleichem Namen." : friendlyError(error),
-        tone: "error",
-      });
-    }
-    setTrash((t) => t?.filter((b) => b.id !== beer.id) ?? null);
-    await refresh();
-    toast({ message: `„${beer.name}“ wiederhergestellt` });
   }
 
   async function leave() {
@@ -228,36 +198,6 @@ export default function SettingsPage() {
         )}
       </Card>
 
-      {isAdmin && (
-        <Card>
-          <h2 className="mb-1 text-lg font-bold">Papierkorb</h2>
-          <p className="mb-3 text-sm text-muted">Gelöschte Biere – samt ihren Bewertungen wiederherstellbar.</p>
-          {trash === null ? (
-            <SkeletonBlock className="h-14" />
-          ) : trash.length === 0 ? (
-            <p className="text-muted">Leer 🎉</p>
-          ) : (
-            <ul className="divide-y divide-line">
-              {trash.map((b) => (
-                <li key={b.id} className="flex min-h-14 items-center gap-3 py-2">
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate font-semibold">{b.name}</p>
-                    <p className="truncate text-sm text-muted">
-                      {[b.brewery, b.deleted_at && `gelöscht am ${new Date(b.deleted_at).toLocaleDateString("de-DE")}`]
-                        .filter(Boolean)
-                        .join(" · ")}
-                    </p>
-                  </div>
-                  <Button variant="secondary" className="min-h-11 px-3" onClick={() => restore(b)}>
-                    <RotateCcw size={18} aria-hidden /> Zurück
-                  </Button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Card>
-      )}
-
       <Card className="space-y-2">
         <Button variant="secondary" className="w-full" onClick={() => setConfirm("leave")}>
           <LogOut size={18} aria-hidden /> Gruppe verlassen
@@ -275,7 +215,8 @@ export default function SettingsPage() {
         title="Gruppe verlassen?"
       >
         <p className="mb-4 text-muted">
-          Deine Bewertungen bleiben in der Gruppe erhalten. Du kannst über einen Einladungslink wieder beitreten.
+          Deine Bewertungen gehören dir und bleiben in deinen anderen Gruppen erhalten. Du kannst über einen
+          Einladungslink wieder beitreten.
         </p>
         <Button className="w-full" variant="danger" disabled={busy} onClick={leave}>
           Ja, „{group.name}“ verlassen
@@ -291,8 +232,9 @@ export default function SettingsPage() {
         title="Gruppe endgültig löschen?"
       >
         <p className="mb-3 text-muted">
-          Alle Biere und Bewertungen dieser Gruppe werden <strong className="text-fg">unwiderruflich</strong> gelöscht.
-          Tippe zur Bestätigung den Gruppennamen ein:
+          Die Gruppe und alle Mitgliedschaften werden <strong className="text-fg">unwiderruflich</strong> gelöscht. Die
+          Bewertungen bleiben bei den Personen erhalten und erscheinen weiter in deren anderen Gruppen. Tippe zur
+          Bestätigung den Gruppennamen ein:
         </p>
         <input
           className={`${inputClass} mb-3`}
